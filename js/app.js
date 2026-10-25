@@ -10,6 +10,29 @@ const validPoster = (path) => typeof path === 'string' && /^\/[\w/-]+\.(jpg|jpeg
 const posterUrl = (path, size = 'w342') => `https://image.tmdb.org/t/p/${size}${path}`;
 const message = (id, text) => { $(id).textContent = text; };
 const errorText = (error) => error?.message || 'Ocorreu um erro. Tente novamente.';
+const animationBase = './assets/animations/';
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function animatedImage(name, className = '') {
+  const img = document.createElement('img');
+  img.src = `${animationBase}${name}.svg`;
+  img.alt = '';
+  img.setAttribute('aria-hidden', 'true');
+  img.className = `asset-animation ${className}`.trim();
+  return img;
+}
+function playLottie(container, name, loop = false) {
+  if (reducedMotion() || !window.lottie) return false;
+  window.lottie.loadAnimation({ container, renderer: 'svg', loop, autoplay: true,
+    path: `${animationBase}${name}.json`, rendererSettings: { preserveAspectRatio: 'xMidYMid meet' } });
+  return true;
+}
+function showSuccess(text) {
+  const feedback = $('list-feedback');
+  feedback.replaceChildren();
+  const icon = animatedImage('success', 'success-asset');
+  feedback.append(icon, document.createTextNode(` ${text}`));
+}
+
 
 let db;
 let items = [];
@@ -121,7 +144,7 @@ function renderResults(results, query) {
 
 async function lookupTmdb(query, version) {
   if (query.length < 3) return;
-  $('lookup-feedback').innerHTML = '<span class="popcorn-loader" aria-hidden="true"><svg class="ui-icon"><use href="#icon-popcorn"/></svg></span> Pesquisando filmes e séries...';
+  $('lookup-feedback').replaceChildren(animatedImage('popcorn', 'popcorn-loader'), document.createTextNode(' Pesquisando filmes e séries...'));
   try {
     const kinds = ['filme', 'serie'];
     const responses = await Promise.all(kinds.map(async (kind) => {
@@ -198,7 +221,7 @@ function render() {
     const empty = document.createElement('div'); empty.className = 'empty';
     const icon = document.createElement('div');
     icon.className = 'empty-cinema-icon';
-    icon.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-film"/></svg>';
+    icon.append(animatedImage('empty-cinema'));
     const text = document.createElement('p');
     text.textContent = items.length ? 'Nenhum título corresponde aos filtros.' : 'Seu cineminha ainda está vazio. Adicione a primeira indicação!';
     empty.append(icon, text);
@@ -207,7 +230,7 @@ function render() {
   for (const item of visible) {
     const poster = validPoster(item.poster_path) ? `<img src="${posterUrl(item.poster_path)}" alt="Capa de ${escapeHtml(item.title)}" loading="lazy">` : '<span aria-hidden="true">🍿</span>';
     const card = document.createElement('article'); card.className = `item ${item.kind === 'serie' ? 'is-series' : 'is-movie'}`;
-    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type"><svg class="ui-icon" aria-hidden="true"><use href="#icon-${item.kind === 'serie' ? 'series' : 'film'}"/></svg>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'Não procurado'}</span><span class="pill">${labels[item.progress] || 'Para assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill">Favorito <svg class="ui-icon favorite-icon" aria-hidden="true"><use href="#icon-heart"/></svg></span>' : ''}</div><button class="button secondary edit" type="button">Editar indicação</button></div>`;
+    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type"><svg class="ui-icon" aria-hidden="true"><use href="#icon-${item.kind === 'serie' ? 'series' : 'film'}"/></svg>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'Não procurado'}</span><span class="pill">${labels[item.progress] || 'Para assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill">Favorito <img class="asset-animation favorite-asset" src="./assets/animations/favorite.svg" alt="" aria-hidden="true"></span>' : ''}</div><button class="button secondary edit" type="button">Editar indicação</button></div>`;
     card.querySelector('.edit').addEventListener('click', () => openEdit(item.id));
     root.append(card);
   }
@@ -330,7 +353,7 @@ async function addItem(event) {
   $('add-button').disabled = false;
   if (error) { message('list-feedback', `Erro ao salvar: ${errorText(error)}`); return; }
   $('add-form').reset(); ['kind', 'availability', 'progress'].forEach(syncChoiceChips); resetLookup(); await load();
-  $('list-feedback').innerHTML = '<span class="success-mark" aria-hidden="true"><svg class="ui-icon"><use href="#icon-check"/></svg></span> Indicação guardada na lista!';
+  showSuccess('Indicação guardada na lista!');
 }
 
 function openEdit(id) {
@@ -446,7 +469,7 @@ async function updateItem(event) {
     is_favorite: $('edit-favorite').checked }).eq('id', $('edit-id').value);
   if (error) { alert(`Não foi possível salvar: ${errorText(error)}`); return; }
   $('edit-dialog').close(); await load();
-  $('list-feedback').innerHTML = '<span class="success-mark" aria-hidden="true"><svg class="ui-icon"><use href="#icon-check"/></svg></span> Alterações salvas com sucesso!';
+  showSuccess('Alterações salvas com sucesso!');
 }
 
 async function deleteItem() {
@@ -469,7 +492,14 @@ function randomPick() {
     return;
   }
   button.disabled = true;
-  result.innerHTML = '<div class="sort-loading" aria-label="Sorteando"><svg class="ui-icon dice-icon" aria-hidden="true"><use href="#icon-dice"/></svg><span>Preparando a próxima sessão...</span></div>';
+  const loading = document.createElement('div');
+  loading.className = 'sort-loading';
+  loading.setAttribute('aria-label', 'Sorteando');
+  const animation = document.createElement('span');
+  animation.className = 'lottie-dice';
+  if (!playLottie(animation, 'dice', true)) animation.innerHTML = '<svg class="ui-icon dice-icon" aria-hidden="true"><use href="#icon-dice"/></svg>';
+  loading.append(animation, document.createTextNode('Preparando a próxima sessão...'));
+  result.append(loading);
   const chosen = available[Math.floor(Math.random() * available.length)];
   randomTimer = setTimeout(() => {
     result.replaceChildren();
@@ -594,6 +624,24 @@ async function init() {
     card.addEventListener('click', () => openStatsDialog(card.dataset.group));
   });
   $('close-stats-dialog').addEventListener('click', () => $('stats-dialog').close());
+  $('home-popcorn').addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: reducedMotion() ? 'instant' : 'smooth' });
+    const button = $('home-popcorn');
+    const toast = $('home-toast');
+    button.classList.remove('popping');
+    void button.offsetWidth;
+    button.classList.add('popping');
+    toast.textContent = 'Se não tem, a gente guarda pra depois! 🍿';
+    toast.classList.add('visible');
+    clearTimeout(button.homeTimer);
+    button.homeTimer = setTimeout(() => { toast.classList.remove('visible'); button.classList.remove('popping'); }, 3000);
+  });
+  const heading = document.querySelector('#add-form')?.closest('section')?.querySelector('.heading-icon');
+  if (heading && !reducedMotion()) {
+    heading.replaceChildren();
+    heading.classList.add('lottie-clapperboard');
+    if (!playLottie(heading, 'clapperboard', true)) heading.textContent = '🎞️';
+  }
   initVoiceInput();
   $('title').addEventListener('input', scheduleLookup);
   $('kind').addEventListener('change', () => { if (!selectedTmdb) scheduleLookup(); });

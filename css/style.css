@@ -446,3 +446,26 @@ footer { border-top: 1px solid rgba(255,255,255,.07); }
 .empty p { margin:0; }
 .favorite-stat-icon { margin-top:5px; color:#ff8193; }
 @media(prefers-reduced-motion:reduce) { .empty-cinema-icon { animation:none; } }
+
+/* Home com pipoca e mensagem temporária */
+.brand { position:relative; }
+.home-popcorn { border:0; background:transparent; padding:3px; border-radius:12px; display:grid; place-items:center; cursor:pointer; }
+.home-popcorn:focus-visible { outline:3px solid #ff96a6; outline-offset:3px; }
+.home-popcorn.popping .brand-logo { animation:home-pop .65s ease-in-out; }
+.home-toast { position:absolute; z-index:20; left:0; top:calc(100% + 5px); padding:8px 13px; border:1px solid #a93d53; border-radius:12px; background:#30131f; color:#fff; font:600 .82rem Roboto,sans-serif; opacity:0; transform:translateY(-6px); pointer-events:none; transition:opacity .2s,transform .2s; white-space:nowrap; max-width:min(90vw,380px); }
+.home-toast.visible { opacity:1; transform:translateY(0); }
+@keyframes home-pop { 0%,100%{transform:rotate(0) scale(1)} 30%{transform:rotate(-16deg) scale(1.2)} 60%{transform:rotate(13deg) scale(.95)} }
+@media(prefers-reduced-motion:reduce){.home-popcorn.popping .brand-logo{animation:none}.home-toast{transition:none}}
+
+/* Arquivos de animação enviados pela usuária */
+.asset-animation { width: 23px; height: 23px; object-fit: contain; vertical-align: middle; display: inline-block; flex: none; }
+.popcorn-loader { width: 27px; height: 27px; }
+.success-asset { width: 27px; height: 27px; animation: pop-in .45s ease-out both; }
+.favorite-asset { width: 21px; height: 21px; }
+.empty-cinema-icon .asset-animation { width: 58px; height: 58px; }
+.lottie-dice { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: none; }
+.lottie-dice svg { width: 100% !important; height: 100% !important; }
+.lottie-clapperboard { display: inline-block; width: 36px; height: 36px; vertical-align: middle; }
+.lottie-clapperboard svg { width: 100% !important; height: 100% !important; }
+.home-popcorn .brand-logo { object-fit: contain; }
+@media (prefers-reduced-motion: reduce) { .success-asset, .popcorn-loader { animation: none; } }
