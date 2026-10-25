@@ -39,7 +39,7 @@ function render() {
     const reel = validUrl(item.reel_url);
     const card = document.createElement('article');
     card.className = 'item';
-    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><h3>${escapeHtml(item.title)}</h3><p>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${availabilityNames[item.availability]}</span><span class="pill">${progressNames[item.progress]}</span></div>${reel ? `<p><a href="${escapeHtml(reel)}" target="_blank" rel="noopener noreferrer">Ver indicação ↗</a></p>` : ''}<button class="button secondary edit" type="button">Editar</button></div>`;
+    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><h3>${escapeHtml(item.title)}</h3><p>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${item.availability === 'sim' ? '📺 ' : item.availability === 'nao' ? '🔎 ' : '⌛ '}${availabilityNames[item.availability]}</span><span class="pill">${item.progress === 'assistido' ? '✅ ' : item.progress === 'assistindo' ? '▶ ' : '🎬 '}${progressNames[item.progress]}</span></div>${reel ? `<p><a href="${escapeHtml(reel)}" target="_blank" rel="noopener noreferrer">Ver indicação ↗</a></p>` : ''}<button class="button secondary edit" type="button">Editar</button></div>`;
     card.querySelector('.edit').addEventListener('click', () => openEdit(item.id));
     container.append(card);
   }
@@ -75,7 +75,7 @@ async function addItem(event) {
   $('add-button').disabled = true;
   const { error } = await db.from('titles').insert({
     title: $('title').value.trim(), kind: $('kind').value, reel_url: $('reel').value.trim() || null,
-    note: $('note').value.trim() || null, availability: 'pendente', progress: 'quero',
+    note: $('note').value.trim() || null, availability: $('availability').value, progress: $('progress').value,
     tmdb_id: selectedTmdb?.id || null, poster_path: selectedTmdb?.poster_path || null
   });
   $('add-button').disabled = false;
@@ -144,9 +144,19 @@ async function searchTmdb() {
         img.alt = '';
         button.append(img);
       }
-      const label = document.createElement('span');
-      label.textContent = `${titleText}${year ? ` (${year})` : ''}`;
-      button.append(label);
+      const meta = document.createElement('span');
+      meta.className = 'tmdb-meta';
+      const name = document.createElement('span');
+      name.className = 'tmdb-name';
+      name.textContent = titleText;
+      const yearEl = document.createElement('span');
+      yearEl.className = 'tmdb-year';
+      yearEl.textContent = year || 'Ano não informado';
+      const overview = document.createElement('span');
+      overview.className = 'tmdb-overview';
+      overview.textContent = result.overview || 'Sinopse não disponível em português.';
+      meta.append(name, yearEl, overview);
+      button.append(meta);
       button.addEventListener('click', () => { selectedTmdb = { id: result.id, poster_path: result.poster_path }; $('title').value = titleText; show('tmdb-results', false); });
       results.append(button);
     }
