@@ -145,16 +145,18 @@ async function load() {
   items = data ?? [];
   message('list-feedback', '');
   render();
+  if ($('stats-dialog').open && activeStatGroup) openStatsDialog(activeStatGroup);
 }
 
 function render() {
   $('count-all').textContent = items.length;
   $('count-found').textContent = items.filter((item) => item.availability === 'sim').length;
   $('count-watched').textContent = items.filter((item) => item.progress === 'assistido').length;
+  $('count-favorites').textContent = items.filter((item) => item.is_favorite === true).length;
   const term = normalize($('search').value);
   const filter = $('filter').value;
   const visible = items.filter((item) => normalize(item.title).includes(term) &&
-    (filter === 'todos' || (['pendente', 'sim', 'nao'].includes(filter) ? item.availability === filter : item.progress === filter)));
+    (filter === 'todos' || (filter === 'favoritos' ? item.is_favorite === true : ['pendente', 'sim', 'nao'].includes(filter) ? item.availability === filter : item.progress === filter)));
   const root = $('items'); root.replaceChildren();
   if (!visible.length) {
     const empty = document.createElement('div'); empty.className = 'empty';
@@ -165,10 +167,75 @@ function render() {
     const reel = validUrl(item.reel_url);
     const poster = validPoster(item.poster_path) ? `<img src="${posterUrl(item.poster_path)}" alt="Capa de ${escapeHtml(item.title)}" loading="lazy">` : '<span aria-hidden="true">🍿</span>';
     const card = document.createElement('article'); card.className = 'item';
-    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type">${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'A procurar'}</span><span class="pill">${labels[item.progress] || 'Quero assistir'}</span></div>${reel ? `<a class="reel-link" href="${escapeHtml(reel)}" target="_blank" rel="noopener noreferrer">Ver Reels ↗</a>` : ''}<button class="button secondary edit" type="button">Editar indicação</button></div>`;
+    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type">${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'A procurar'}</span><span class="pill">${labels[item.progress] || 'Quero assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill">♥ Favorito</span>' : ''}</div>${reel ? `<a class="reel-link" href="${escapeHtml(reel)}" target="_blank" rel="noopener noreferrer">Ver Reels ↗</a>` : ''}<button class="button secondary edit" type="button">Editar indicação</button></div>`;
     card.querySelector('.edit').addEventListener('click', () => openEdit(item.id));
     root.append(card);
   }
+}
+
+
+const statGroupNames = {
+  todos: 'Todas as indicações',
+  sim: 'Disponíveis no IPTV',
+  assistido: 'Já assistimos',
+  favoritos: 'Nossos favoritos'
+};
+let activeStatGroup = null;
+
+function getStatItems(group) {
+  if (group === 'sim') return items.filter((item) => item.availability === 'sim');
+  if (group === 'assistido') return items.filter((item) => item.progress === 'assistido');
+  if (group === 'favoritos') return items.filter((item) => item.is_favorite === true);
+  return items;
+}
+
+function openStatsDialog(group) {
+  activeStatGroup = group;
+  const records = getStatItems(group);
+  $('stats-dialog-title').textContent = statGroupNames[group] || 'Nossa lista';
+  $('stats-dialog-subtitle').textContent = `${records.length} título${records.length === 1 ? '' : 's'} nesta categoria`;
+  const container = $('stats-dialog-items');
+  container.replaceChildren();
+
+  if (!records.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = 'Ainda não temos títulos nesta categoria.';
+    container.append(empty);
+  }
+
+  for (const item of records) {
+    const row = document.createElement('div');
+    row.className = 'stats-list-row';
+    const poster = validPoster(item.poster_path) ? document.createElement('img') : document.createElement('span');
+    if (poster.tagName === 'IMG') {
+      poster.src = posterUrl(item.poster_path, 'w92');
+      poster.alt = `Capa de ${item.title}`;
+      poster.loading = 'lazy';
+    } else {
+      poster.className = 'stats-list-placeholder';
+      poster.textContent = '🍿';
+    }
+    const details = document.createElement('div');
+    details.className = 'stats-list-info';
+    const title = document.createElement('strong');
+    title.textContent = item.title;
+    const status = document.createElement('small');
+    status.textContent = `${item.kind === 'serie' ? 'Série' : 'Filme'} · ${labels[item.availability] || 'A procurar'} · ${labels[item.progress] || 'Quero assistir'}${item.is_favorite ? ' · ♥ Favorito' : ''}`;
+    details.append(title, status);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'button secondary';
+    button.textContent = 'Editar';
+    button.addEventListener('click', () => {
+      $('stats-dialog').close();
+      openEdit(item.id);
+    });
+    row.append(poster, details, button);
+    container.append(row);
+  }
+
+  if (!$('stats-dialog').open) $('stats-dialog').showModal();
 }
 
 async function setAuth(session) {
@@ -201,7 +268,8 @@ async function addItem(event) {
   const { error } = await db.from('titles').insert({ title, kind: $('kind').value,
     reel_url: $('reel').value.trim() || null, note: $('note').value.trim() || null,
     availability: $('availability').value, progress: $('progress').value,
-    tmdb_id: selectedTmdb?.id || null, poster_path: selectedTmdb?.poster_path || null });
+    tmdb_id: selectedTmdb?.id || null, poster_path: selectedTmdb?.poster_path || null,
+    is_favorite: $('favorite').checked });
   $('add-button').disabled = false;
   if (error) { message('list-feedback', `Erro ao salvar: ${errorText(error)}`); return; }
   $('add-form').reset(); resetLookup(); await load();
@@ -213,6 +281,7 @@ function openEdit(id) {
   $('edit-id').value = item.id; $('edit-title').value = item.title;
   $('edit-availability').value = item.availability; $('edit-progress').value = item.progress;
   $('edit-note').value = item.note || ''; $('edit-reel').value = item.reel_url || '';
+  $('edit-favorite').checked = item.is_favorite === true;
   editPoster = { id: item.tmdb_id ?? null, poster_path: item.poster_path ?? null };
   renderEditPoster();
   $('edit-dialog').showModal();
@@ -314,7 +383,8 @@ async function updateItem(event) {
   const { error } = await db.from('titles').update({ title: $('edit-title').value.trim(),
     availability: $('edit-availability').value, progress: $('edit-progress').value,
     note: $('edit-note').value.trim() || null, reel_url: $('edit-reel').value.trim() || null,
-    tmdb_id: editPoster?.id ?? null, poster_path: editPoster?.poster_path ?? null }).eq('id', $('edit-id').value);
+    tmdb_id: editPoster?.id ?? null, poster_path: editPoster?.poster_path ?? null,
+    is_favorite: $('edit-favorite').checked }).eq('id', $('edit-id').value);
   if (error) { alert(`Não foi possível salvar: ${errorText(error)}`); return; }
   $('edit-dialog').close(); await load();
 }
@@ -353,6 +423,10 @@ async function init() {
   $('search').addEventListener('input', render);
   $('filter').addEventListener('change', render);
   $('random').addEventListener('click', randomPick);
+  document.querySelectorAll('.stat-card').forEach((card) => {
+    card.addEventListener('click', () => openStatsDialog(card.dataset.group));
+  });
+  $('close-stats-dialog').addEventListener('click', () => $('stats-dialog').close());
   $('title').addEventListener('input', scheduleLookup);
   $('kind').addEventListener('change', scheduleLookup);
   $('tmdb-search').addEventListener('click', () => { clearTimeout(searchTimer); void lookupTmdb($('title').value.trim(), $('kind').value, ++searchVersion); });
