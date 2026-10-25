@@ -3,10 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { config } from './config.js';
 
 const $ = (id) => document.getElementById(id);
-
-const show = (id, visible) => {
-  $(id).classList.toggle('hidden', !visible);
-};
+const show = (id, visible) => $(id).classList.toggle('hidden', !visible);
 
 const availabilityNames = {
   pendente: 'A procurar',
@@ -21,22 +18,22 @@ const progressNames = {
 };
 
 const escapeHtml = (value) =>
-  String(value ?? '').replace(/[&<>"']/g, (character) => ({
+  String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
     "'": '&#39;'
-  })[character]);
+  })[char]);
 
-const validUrl = (value) => {
+function validUrl(value) {
   try {
     const url = new URL(value);
     return ['https:', 'http:'].includes(url.protocol) ? url.href : '';
   } catch {
     return '';
   }
-};
+}
 
 let db;
 let items = [];
@@ -57,22 +54,20 @@ async function load() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    message('list-feedback', `Não foi possível carregar: ${errorText(error)}`);
+    message('list-feedback', `Erro ao carregar: ${errorText(error)}`);
     return;
   }
 
+  items = data || [];
   message('list-feedback', '');
-  items = data;
   render();
 }
 
 function render() {
   $('count-all').textContent = items.length;
-
   $('count-found').textContent = items.filter(
     (item) => item.availability === 'sim'
   ).length;
-
   $('count-watched').textContent = items.filter(
     (item) => item.progress === 'assistido'
   ).length;
@@ -98,23 +93,19 @@ function render() {
   container.replaceChildren();
 
   if (!visible.length) {
-    container.innerHTML = `
-      <div class="empty">
-        Nenhum título por aqui. Que tal guardar a primeira indicação? ♥
-      </div>
-    `;
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Nenhum título encontrado. Que tal adicionar uma indicação?';
+    container.append(empty);
     return;
   }
 
   for (const item of visible) {
     const poster = item.poster_path &&
       /^\/[\w/-]+\.(jpg|png|webp)$/i.test(item.poster_path)
-      ? `<img
-          alt="Capa de ${escapeHtml(item.title)}"
-          loading="lazy"
-          src="https://image.tmdb.org/t/p/w342${item.poster_path}"
-        >`
-      : '✦';
+      ? `<img src="https://image.tmdb.org/t/p/w342${item.poster_path}"
+          alt="Capa de ${escapeHtml(item.title)}" loading="lazy">`
+      : '🍿';
 
     const reel = validUrl(item.reel_url);
 
@@ -123,7 +114,6 @@ function render() {
 
     card.innerHTML = `
       <div class="poster">${poster}</div>
-
       <div class="item-body">
         <h3>${escapeHtml(item.title)}</h3>
         <p>${item.kind === 'serie' ? 'Série' : 'Filme'}</p>
@@ -132,22 +122,20 @@ function render() {
           <span class="pill ${item.availability === 'sim' ? 'ok' : ''}">
             ${availabilityNames[item.availability] || 'A procurar'}
           </span>
-
           <span class="pill">
             ${progressNames[item.progress] || 'Quero assistir'}
           </span>
         </div>
 
-        ${reel
-          ? `<p>
-               <a href="${escapeHtml(reel)}"
-                  target="_blank"
-                  rel="noopener noreferrer">
-                 Ver indicação ↗
-               </a>
-             </p>`
-          : ''
-        }
+        ${reel ? `
+          <p>
+            <a href="${escapeHtml(reel)}"
+               target="_blank"
+               rel="noopener noreferrer">
+              Ver indicação ↗
+            </a>
+          </p>
+        ` : ''}
 
         <button class="button secondary edit" type="button">
           Editar
@@ -180,14 +168,11 @@ async function setAuth(session) {
 async function submitAuth(event) {
   event.preventDefault();
 
-  const email = $('email').value.trim();
-  const password = $('password').value;
-
   message('auth-feedback', 'Entrando...');
 
   const { error } = await db.auth.signInWithPassword({
-    email,
-    password
+    email: $('email').value.trim(),
+    password: $('password').value
   });
 
   message(
@@ -201,10 +186,7 @@ async function signup() {
   const password = $('password').value;
 
   if (!email || password.length < 8) {
-    message(
-      'auth-feedback',
-      'Preencha e-mail e senha de pelo menos 8 caracteres.'
-    );
+    message('auth-feedback', 'Informe e-mail e senha de pelo menos 8 caracteres.');
     return;
   }
 
@@ -218,19 +200,24 @@ async function signup() {
 
   message(
     'auth-feedback',
-    error
-      ? errorText(error)
-      : 'Conta solicitada. Confira seu e-mail, se necessário.'
+    error ? errorText(error) : 'Confira seu e-mail, se necessário.'
   );
 }
 
 async function addItem(event) {
   event.preventDefault();
 
+  const title = $('title').value.trim();
+
+  if (!title) {
+    message('list-feedback', 'Informe o nome do filme ou série.');
+    return;
+  }
+
   $('add-button').disabled = true;
 
   const { error } = await db.from('titles').insert({
-    title: $('title').value.trim(),
+    title,
     kind: $('kind').value,
     reel_url: $('reel').value.trim() || null,
     note: $('note').value.trim() || null,
@@ -249,16 +236,14 @@ async function addItem(event) {
 
   $('add-form').reset();
   selectedTmdb = null;
-
   show('tmdb-results', false);
 
   await load();
-  message('list-feedback', 'Indicação guardada! ♥');
+  message('list-feedback', 'Indicação salva com sucesso!');
 }
 
 function openEdit(id) {
-  const item = items.find((title) => title.id === id);
-
+  const item = items.find((entry) => entry.id === id);
   if (!item) return;
 
   $('edit-id').value = item.id;
@@ -274,8 +259,6 @@ function openEdit(id) {
 async function updateItem(event) {
   event.preventDefault();
 
-  const id = $('edit-id').value;
-
   const { error } = await db
     .from('titles')
     .update({
@@ -285,10 +268,10 @@ async function updateItem(event) {
       note: $('edit-note').value.trim() || null,
       reel_url: $('edit-reel').value.trim() || null
     })
-    .eq('id', id);
+    .eq('id', $('edit-id').value);
 
   if (error) {
-    alert(`Não foi possível salvar: ${errorText(error)}`);
+    alert(`Erro ao salvar: ${errorText(error)}`);
     return;
   }
 
@@ -305,7 +288,7 @@ async function deleteItem() {
     .eq('id', $('edit-id').value);
 
   if (error) {
-    alert(`Não foi possível excluir: ${errorText(error)}`);
+    alert(`Erro ao excluir: ${errorText(error)}`);
     return;
   }
 
@@ -315,17 +298,17 @@ async function deleteItem() {
 
 async function searchTmdb() {
   const title = $('title').value.trim();
+  const results = $('tmdb-results');
+  const button = $('tmdb-search');
 
   if (!title) {
-    message('list-feedback', 'Digite um título antes de pesquisar.');
+    message('list-feedback', 'Digite o nome de um filme ou série.');
     return;
   }
 
-  const results = $('tmdb-results');
-
+  button.disabled = true;
   results.replaceChildren();
   show('tmdb-results', true);
-
   results.textContent = 'Buscando filmes e séries...';
 
   try {
@@ -337,7 +320,20 @@ async function searchTmdb() {
     });
 
     if (error) {
-      throw new Error(error.message || 'Falha ao consultar o Supabase.');
+      let detail = error.message;
+
+      if (error.context instanceof Response) {
+        const response = error.context;
+
+        try {
+          const body = await response.json();
+          detail = body.error || body.message || detail;
+        } catch {
+          detail = `Erro HTTP ${response.status}: ${detail}`;
+        }
+      }
+
+      throw new Error(detail);
     }
 
     if (data?.error) {
@@ -345,30 +341,30 @@ async function searchTmdb() {
     }
 
     if (!Array.isArray(data?.results)) {
-      throw new Error('Resposta inválida da API.');
+      throw new Error('A API retornou uma resposta inválida.');
     }
 
     results.replaceChildren();
 
+    if (!data.results.length) {
+      results.textContent = 'Nenhum resultado encontrado. Você pode cadastrar manualmente.';
+      return;
+    }
+
     for (const result of data.results.slice(0, 5)) {
-      const button = document.createElement('button');
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'tmdb-option';
 
-      button.type = 'button';
-      button.className = 'tmdb-option';
-
-      const titleText = result.title;
+      const titleText = result.title || 'Título desconhecido';
       const year = (result.release_date || '').slice(0, 4);
 
       if (result.poster_path) {
         const image = document.createElement('img');
-
-        image.src =
-          `https://image.tmdb.org/t/p/w92${result.poster_path}`;
-
-        image.alt = `Capa de ${titleText || 'filme'}`;
+        image.src = `https://image.tmdb.org/t/p/w92${result.poster_path}`;
+        image.alt = `Capa de ${titleText}`;
         image.loading = 'lazy';
-
-        button.append(image);
+        option.append(image);
       }
 
       const meta = document.createElement('span');
@@ -376,21 +372,20 @@ async function searchTmdb() {
 
       const name = document.createElement('span');
       name.className = 'tmdb-name';
-      name.textContent = titleText || 'Título desconhecido';
+      name.textContent = titleText;
 
-      const yearElement = document.createElement('span');
-      yearElement.className = 'tmdb-year';
-      yearElement.textContent = year || 'Ano não informado';
+      const releaseYear = document.createElement('span');
+      releaseYear.className = 'tmdb-year';
+      releaseYear.textContent = year || 'Ano não informado';
 
       const overview = document.createElement('span');
       overview.className = 'tmdb-overview';
-      overview.textContent =
-        result.overview || 'Sinopse não disponível em português.';
+      overview.textContent = result.overview || 'Sinopse não disponível.';
 
-      meta.append(name, yearElement, overview);
-      button.append(meta);
+      meta.append(name, releaseYear, overview);
+      option.append(meta);
 
-      button.addEventListener('click', () => {
+      option.addEventListener('click', () => {
         selectedTmdb = {
           id: result.id,
           poster_path: result.poster_path
@@ -398,19 +393,18 @@ async function searchTmdb() {
 
         $('title').value = titleText;
         show('tmdb-results', false);
+        message('list-feedback', 'Filme selecionado! Agora você pode salvar.');
       });
 
-      results.append(button);
-    }
-
-    if (!data.results.length) {
-      results.textContent =
-        'Nenhum resultado encontrado. Você pode cadastrar manualmente.';
+      results.append(option);
     }
   } catch (error) {
+    console.error('Erro na integração TMDB:', error);
+
     results.textContent =
-      `Busca indisponível: ${errorText(error)}. ` +
-      'Você ainda pode cadastrar manualmente.';
+      `Busca indisponível: ${errorText(error)}. Você pode cadastrar manualmente.`;
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -422,19 +416,12 @@ function randomPick() {
   );
 
   if (!eligible.length) {
-    message(
-      'list-feedback',
-      'Marquem filmes disponíveis no IPTV para poder sortear.'
-    );
+    message('list-feedback', 'Marquem filmes disponíveis no IPTV para sortear.');
     return;
   }
 
-  const choice = eligible[Math.floor(Math.random() * eligible.length)];
-
-  message(
-    'list-feedback',
-    `Que tal assistir: ${choice.title}? ♥`
-  );
+  const index = Math.floor(Math.random() * eligible.length);
+  message('list-feedback', `Que tal assistir: ${eligible[index].title}?`);
 }
 
 async function init() {
@@ -449,7 +436,6 @@ async function init() {
   );
 
   $('auth-form').addEventListener('submit', submitAuth);
-
   $('signup').addEventListener('click', signup);
 
   $('logout').addEventListener('click', async () => {
@@ -458,7 +444,6 @@ async function init() {
 
   $('add-form').addEventListener('submit', addItem);
   $('edit-form').addEventListener('submit', updateItem);
-
   $('delete-item').addEventListener('click', deleteItem);
 
   $('close-dialog').addEventListener('click', () => {
@@ -467,7 +452,6 @@ async function init() {
 
   $('search').addEventListener('input', render);
   $('filter').addEventListener('change', render);
-
   $('random').addEventListener('click', randomPick);
 
   $('title').addEventListener('input', () => {
@@ -476,6 +460,7 @@ async function init() {
 
   $('kind').addEventListener('change', () => {
     selectedTmdb = null;
+    show('tmdb-results', false);
   });
 
   show('tmdb-search', true);
@@ -487,19 +472,14 @@ async function init() {
     void setAuth(session);
   });
 
-  const {
-    data: { session }
-  } = await db.auth.getSession();
-
+  const { data: { session } } = await db.auth.getSession();
   await setAuth(session);
 }
 
 init().catch((error) => {
+  console.error('Erro ao iniciar Nossa Lista:', error);
   show('setup', true);
-
   $('setup').append(
-    document.createTextNode(
-      ` Erro ao iniciar: ${errorText(error)}`
-    )
+    document.createTextNode(` Erro ao iniciar: ${errorText(error)}`)
   );
 });
