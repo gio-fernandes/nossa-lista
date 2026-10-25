@@ -318,3 +318,86 @@ footer { border-top: 1px solid rgba(255,255,255,.07); }
 .tmdb-option.result-series .result-kind { background: #145b66; color: #b6f4f6; }
 @media(max-width: 960px) { .filter-bar { grid-template-columns: 1fr 1fr; } .filter-search { grid-column: 1/-1; } }
 @media(max-width: 700px) { .filter-bar { grid-template-columns: 1fr; } .filter-search { grid-column: auto; } .random-box { max-width: none; text-align: left; } .section-heading { align-items: stretch; } }
+
+/* V7: seleção rápida e sorteio próximo ao botão */
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+.field-label { display: block; margin-bottom: 9px; color: #f5dfe5; font-weight: 700; font-size: .94rem; }
+.choice-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 3px 0; min-height: 49px; align-items: center; }
+.choice-chip { min-height: 41px; padding: 9px 14px; border: 1px solid #6a3a49; border-radius: 100px; color: #f2dbe2; background: #22131c; font-size: .9rem; font-weight: 700; transition: border-color .2s, background .2s, transform .2s; }
+.choice-chip:hover { border-color: #f77184; background: #3a1b29; }
+.choice-chip:focus-visible { outline: 3px solid #ff96a6; outline-offset: 3px; }
+.choice-chip[aria-pressed="true"] { border-color: #ff5368; background: #b81533; color: #fff; box-shadow: 0 0 0 2px #ff385021; }
+.choice-chip[data-field="kind"][data-value="serie"][aria-pressed="true"] { border-color: #63d7dd; background: #126b76; }
+.random-box { display: flex; flex-direction: column; align-items: flex-end; }
+.random-result { width: min(310px, 100%); margin-top: 13px; padding: 14px; border: 1px solid #ff5368; border-radius: 12px; background: linear-gradient(135deg, #3a1422, #1b1119); text-align: left; box-shadow: 0 6px 20px #0003; }
+.random-result .random-kicker { display: block; color: #ff9ead; font-size: .78rem; margin-bottom: 4px; font-weight: 700; }
+.random-result strong { display: block; font: 800 1.05rem/1.4 'Manrope', sans-serif; overflow-wrap: anywhere; }
+.random-result small { display: block; color: #e6b6c5; margin-top: 5px; }
+.favorite-icon { width: 17px; height: 17px; flex: none; vertical-align: middle; margin-right: 4px; }
+.stat-icon .favorite-icon { width: 22px; height: 22px; }
+.favorite-checkbox span { display: inline-flex; align-items: center; gap: 4px; }
+@media(max-width: 700px) { .random-box { align-items: stretch; } .random-result { width: 100%; } .choice-chip { min-height: 44px; } }
+
+
+/* V9 — controles estáveis e ícones com tamanho fixo */
+#add-form select.visually-hidden,
+#add-form select[hidden] { display: none !important; }
+#add-form .choice-chips,
+.collection .filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 8px;
+}
+#add-form .choice-chip,
+.collection .filter-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border: 1px solid #754051;
+  border-radius: 999px;
+  background: #25141e;
+  color: #ffe4ea;
+  font: 700 .86rem/1.3 'Roboto', sans-serif;
+  text-align: center;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#add-form .choice-chip[aria-pressed="true"],
+.collection .filter-chip[aria-pressed="true"] {
+  color: #fff;
+  border-color: #ff6176;
+  background: #d71939;
+}
+#add-form .choice-chip[data-value="serie"][aria-pressed="true"],
+.collection .filter-chip[data-type="serie"][aria-pressed="true"] {
+  background: #126b76;
+  border-color: #63d7dd;
+}
+.favorite-icon,
+#add-form .favorite-icon,
+.collection .favorite-icon,
+#edit-dialog .favorite-icon {
+  display: inline-block;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px;
+  max-width: 18px;
+  max-height: 18px;
+  vertical-align: middle;
+  flex: none;
+}
+.stats .stat-icon .favorite-icon { width: 22px !important; height: 22px !important; max-width: 22px; max-height: 22px; }
+.favorite-checkbox { display: inline-flex; align-items: center; gap: 9px; }
+.favorite-checkbox input[type="checkbox"] { width: 19px; height: 19px; min-height: 19px; flex: none; }
+.favorite-checkbox > span { display: inline-flex; align-items: center; gap: 6px; }
+.collection .filter-group { min-width: 0; }
+.collection .filter-chip .favorite-icon { margin-right: 3px; }
+@media (max-width: 700px) {
+  #add-form .choice-chip, .collection .filter-chip { white-space: normal; min-height: 44px; }
+}
