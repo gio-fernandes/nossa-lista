@@ -155,8 +155,16 @@ function render() {
   $('count-favorites').textContent = items.filter((item) => item.is_favorite === true).length;
   const term = normalize($('search').value);
   const filter = $('filter').value;
-  const visible = items.filter((item) => normalize(item.title).includes(term) &&
-    (filter === 'todos' || (filter === 'favoritos' ? item.is_favorite === true : ['pendente', 'sim', 'nao'].includes(filter) ? item.availability === filter : item.progress === filter)));
+  const type = $('type-filter').value;
+  const visible = items.filter((item) => {
+    const matchesName = normalize(item.title).includes(term);
+    const matchesType = type === 'todos' || item.kind === type;
+    const matchesStatus = filter === 'todos' ||
+      (filter === 'favoritos' ? item.is_favorite === true :
+        ['pendente', 'sim', 'nao'].includes(filter) ? item.availability === filter : item.progress === filter);
+    return matchesName && matchesType && matchesStatus;
+  });
+  $('filter-count').textContent = `${visible.length} de ${items.length} títulos`;
   const root = $('items'); root.replaceChildren();
   if (!visible.length) {
     const empty = document.createElement('div'); empty.className = 'empty';
@@ -166,8 +174,8 @@ function render() {
   for (const item of visible) {
     const reel = validUrl(item.reel_url);
     const poster = validPoster(item.poster_path) ? `<img src="${posterUrl(item.poster_path)}" alt="Capa de ${escapeHtml(item.title)}" loading="lazy">` : '<span aria-hidden="true">🍿</span>';
-    const card = document.createElement('article'); card.className = 'item';
-    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type">${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'A procurar'}</span><span class="pill">${labels[item.progress] || 'Quero assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill">♥ Favorito</span>' : ''}</div>${reel ? `<a class="reel-link" href="${escapeHtml(reel)}" target="_blank" rel="noopener noreferrer">Ver Reels ↗</a>` : ''}<button class="button secondary edit" type="button">Editar indicação</button></div>`;
+    const card = document.createElement('article'); card.className = `item ${item.kind === 'serie' ? 'is-series' : 'is-movie'}`;
+    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type"><span class="type-dot" aria-hidden="true"></span>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'A procurar'}</span><span class="pill">${labels[item.progress] || 'Quero assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill">♥ Favorito</span>' : ''}</div>${reel ? `<a class="reel-link" href="${escapeHtml(reel)}" target="_blank" rel="noopener noreferrer">Ver Reels ↗</a>` : ''}<button class="button secondary edit" type="button">Editar indicação</button></div>`;
     card.querySelector('.edit').addEventListener('click', () => openEdit(item.id));
     root.append(card);
   }
@@ -403,6 +411,72 @@ function randomPick() {
   message('list-feedback', `Sugestão para hoje: ${chosen.title}`);
 }
 
+let voiceRecognition = null;
+let voiceActive = false;
+
+function initVoiceInput() {
+  const button = $('voice-title');
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!Recognition) {
+    button.disabled = true;
+    button.title = 'Seu navegador não oferece reconhecimento de voz';
+    message('voice-feedback', 'Seu navegador não oferece ditado por voz. Você pode digitar normalmente.');
+    return;
+  }
+
+  voiceRecognition = new Recognition();
+  voiceRecognition.lang = 'pt-BR';
+  voiceRecognition.continuous = false;
+  voiceRecognition.interimResults = false;
+  voiceRecognition.maxAlternatives = 1;
+
+  voiceRecognition.onstart = () => {
+    voiceActive = true;
+    button.classList.add('is-listening');
+    button.setAttribute('aria-label', 'Parar ditado');
+    message('voice-feedback', 'Ouvindo... fale o nome do filme ou série.');
+  };
+
+  voiceRecognition.onresult = (event) => {
+    const spoken = event.results?.[0]?.[0]?.transcript?.trim();
+    if (!spoken) return;
+    $('title').value = spoken.slice(0, 160);
+    $('title').dispatchEvent(new Event('input', { bubbles: true }));
+    message('voice-feedback', `Reconhecido: ${$('title').value}`);
+  };
+
+  voiceRecognition.onerror = (event) => {
+    const text = {
+      'not-allowed': 'Microfone bloqueado. Autorize o acesso nas configurações do navegador.',
+      'audio-capture': 'Microfone não encontrado ou indisponível.',
+      'no-speech': 'Não consegui ouvir. Tente falar novamente.',
+      'network': 'O serviço de reconhecimento de voz não respondeu.',
+      'service-not-allowed': 'Reconhecimento de voz não permitido neste navegador.'
+    }[event.error] || 'Não foi possível reconhecer a fala. Digite o nome normalmente.';
+    message('voice-feedback', text);
+  };
+
+  voiceRecognition.onend = () => {
+    voiceActive = false;
+    button.classList.remove('is-listening');
+    button.setAttribute('aria-label', 'Ditar nome do filme ou série');
+  };
+
+  button.addEventListener('click', () => {
+    if (voiceActive) {
+      voiceRecognition.stop();
+      return;
+    }
+    message('voice-feedback', 'Solicitando acesso ao microfone...');
+    try {
+      voiceRecognition.start();
+    } catch {
+      message('voice-feedback', 'Não foi possível iniciar o microfone. Tente novamente.');
+    }
+  });
+}
+
 async function init() {
   if (!config.supabaseUrl || !config.supabasePublishableKey) { show('setup', true); return; }
   db = createClient(config.supabaseUrl, config.supabasePublishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: authStorage } });
@@ -422,11 +496,14 @@ async function init() {
   $('poster-dialog').addEventListener('close', () => { clearTimeout(posterModalTimer); posterModalVersion++; });
   $('search').addEventListener('input', render);
   $('filter').addEventListener('change', render);
+  $('type-filter').addEventListener('change', render);
+  $('clear-filters').addEventListener('click', () => { $('search').value = ''; $('filter').value = 'todos'; $('type-filter').value = 'todos'; render(); });
   $('random').addEventListener('click', randomPick);
   document.querySelectorAll('.stat-card').forEach((card) => {
     card.addEventListener('click', () => openStatsDialog(card.dataset.group));
   });
   $('close-stats-dialog').addEventListener('click', () => $('stats-dialog').close());
+  initVoiceInput();
   $('title').addEventListener('input', scheduleLookup);
   $('kind').addEventListener('change', scheduleLookup);
   $('tmdb-search').addEventListener('click', () => { clearTimeout(searchTimer); void lookupTmdb($('title').value.trim(), $('kind').value, ++searchVersion); });

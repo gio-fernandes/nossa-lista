@@ -252,3 +252,33 @@ footer { border-top: 1px solid rgba(255,255,255,.07); }
   .stats-list-row { flex-wrap: wrap; }
   .stats-list-row button { width: 100%; }
 }
+
+/* V5 — ditado por voz, diferenciação de mídia e filtros */
+.title-voice-field { position: relative; }
+.title-voice-field input { padding-right: 62px; }
+.voice-button { position: absolute; top: 5px; right: 5px; display: grid; place-items: center; width: 44px; height: 43px; color: #ffdce2; border: 1px solid #75384a; border-radius: 9px; background: #34202a; transition: background .2s, box-shadow .2s; }
+.voice-button:hover { background: #552634; }
+.voice-button:focus-visible { outline: 2px solid #ff8b9e; outline-offset: 2px; }
+.voice-button:disabled { opacity: .4; cursor: not-allowed; }
+.voice-button svg { width: 22px; height: 22px; }
+.voice-button.is-listening { background: #b80e2d; box-shadow: 0 0 0 5px rgba(229,9,20,.18); animation: voice-pulse 1.3s ease-in-out infinite; }
+.voice-feedback { min-height: 1.3em; margin: 5px 0 0; color: #f6b5c0; font-size: .78rem; }
+@keyframes voice-pulse { 50% { box-shadow: 0 0 0 9px rgba(229,9,20,.07); } }
+.filters { grid-template-columns: minmax(210px,2fr) minmax(145px,1fr) minmax(170px,1fr) auto; align-items: end; }
+.filter-field { min-width: 0; }
+.filter-field label { margin-bottom: 7px; font-size: .82rem; }
+.clear-filters { min-height: 53px; border: 1px solid #55303d; white-space: nowrap; }
+.filter-count { margin: -8px 0 20px; color: #cdbcc4; font-size: .84rem; }
+.item.is-movie { border-color: #743342; }
+.item.is-series { border-color: #38566f; }
+.item.is-movie:hover { border-color: #f06a7b; }
+.item.is-series:hover { border-color: #6eb3e5; }
+.item.is-movie .item-type { color: #ff9fab !important; }
+.item.is-series .item-type { color: #9dd7ff !important; }
+.item.is-movie .poster { background: linear-gradient(145deg,#7a263a,#28151e 70%,#100c12); }
+.item.is-series .poster { background: linear-gradient(145deg,#294969,#152332 70%,#0d1119); }
+.item-type { display: flex; align-items: center; gap: 8px; }
+.type-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+@media (max-width: 950px) { .filters { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) { .filters { grid-template-columns: 1fr; } .clear-filters { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .voice-button.is-listening { animation: none; } }
