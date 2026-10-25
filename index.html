@@ -1,30 +1,228 @@
+
 <!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090708">
+  <meta name="description" content="Nossa lista compartilhada de filmes e séries.">
   <title>Nossa Lista — Filmes & Séries</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🍿%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./css/style.css">
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+  <link rel="stylesheet" href="./css/style.css?v=5">
 </head>
 <body>
   <main class="shell">
-    <header class="topbar"><div class="brand"><span class="brand-icon" aria-hidden="true">🍿</span><span>Nossa Lista</span></div><button id="logout" class="button ghost hidden">Sair</button></header>
-    <section id="setup" class="panel hidden"><h1>Quase pronto!</h1><p>Configure o Supabase em <code>js/config.js</code> para sincronizar a lista entre vocês.</p><p>Veja o passo a passo no README.md.</p></section>
-    <section id="auth" class="auth-card hidden"><p class="eyebrow">Só nosso cantinho</p><h1>O que vamos assistir? <span>♥</span></h1><p>Entre para guardar todas as indicações que vocês encontram por aí.</p><form id="auth-form"><label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required placeholder="voce@exemplo.com"><label for="password">Senha</label><input id="password" type="password" minlength="6" autocomplete="current-password" required placeholder="Sua senha"><button class="button primary" type="submit">Entrar</button></form><p class="hint">Para criar as duas contas, use o botão abaixo. Só e-mails autorizados terão acesso à lista.</p><button id="signup" class="button ghost">Criar minha conta</button><p id="auth-feedback" class="feedback" role="status"></p></section>
-    <section id="app" class="hidden">
-      <div class="hero"><p class="eyebrow">NOSSO CINEMINHA PARTICULAR 🍿</p><h1>As próximas histórias<br>que vamos viver juntos. <span>♥</span></h1><p>Encontrou um filme no Reels? Anota aqui. Depois é só procurar no IPTV.</p></div>
-      <div class="stats"><div><strong id="count-all">0</strong><span>Na lista</span></div><div><strong id="count-found">0</strong><span>No IPTV</span></div><div><strong id="count-watched">0</strong><span>Assistidos</span></div></div>
-      <section class="panel"><h2><span class="heading-icon" aria-hidden="true">✦</span> Adicionar indicação</h2><form id="add-form"><div class="form-grid"><div><label for="title">Nome do filme ou série *</label><input id="title" required maxlength="160" placeholder="Ex.: Um filme que vimos no Reels"></div><div><label for="kind">Tipo</label><select id="kind"><option value="filme">Filme</option><option value="serie">Série</option></select></div></div><div class="form-grid"><div><label for="reel">Link do Reels (opcional)</label><input id="reel" type="url" maxlength="1500" placeholder="https://..."></div><div><label for="note">Observação (opcional)</label><input id="note" maxlength="300" placeholder="Quem indicou? Algum detalhe?"></div></div><div class="form-grid status-grid"><div><label for="availability"><span class="label-icon" aria-hidden="true">📺</span> Encontramos no IPTV?</label><select id="availability"><option value="pendente">Ainda não procuramos</option><option value="sim">Sim, está disponível</option><option value="nao">Não encontramos</option></select></div><div><label for="progress"><span class="label-icon" aria-hidden="true">🎬</span> Já assistimos?</label><select id="progress"><option value="quero">Queremos assistir</option><option value="assistindo">Estamos assistindo</option><option value="assistido">Já assistimos</option></select></div></div><div class="actions"><button type="submit" id="add-button" class="button primary">+ Guardar indicação</button><button type="button" id="tmdb-search" class="button secondary hidden">Buscar capa e sinopse</button></div><div id="tmdb-results" class="tmdb-results hidden"></div></form></section>
-      <section class="collection"><div class="section-heading"><div><p class="eyebrow">NOSSA COLEÇÃO</p><h2><span class="heading-icon" aria-hidden="true">🍿</span> Nosso catálogo de indicações</h2></div><button class="button secondary" id="random">Surpreenda a gente ✨</button></div><div class="filters"><input id="search" aria-label="Buscar na lista" placeholder="Buscar na nossa lista..."><select id="filter"><option value="todos">Todos os títulos</option><option value="pendente">Ainda não procuramos</option><option value="sim">Disponíveis no IPTV</option><option value="nao">Não encontrados</option><option value="assistindo">Assistindo</option><option value="assistido">Já assistimos</option></select></div><p id="list-feedback" class="feedback" role="status"></p><div id="items" class="items"></div></section>
+    <header class="topbar">
+      <div class="brand">
+        <img class="brand-logo" src="./assets/favicon.svg" width="44" height="44" alt="">
+        <span>Nossa Lista</span>
+      </div>
+      <button id="logout" class="button ghost hidden">Sair</button>
+    </header>
+
+    <section id="setup" class="panel hidden">
+      <h1>Quase pronto!</h1>
+      <p>Configure o Supabase no arquivo <code>js/config.js</code>.</p>
     </section>
-    <footer>Feito para nossas noites de filme ♥ <span id="tmdb-credit" class="hidden">Dados e imagens: <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>. Este produto usa a API do TMDB, mas não é endossado ou certificado pelo TMDB.</span></footer>
+
+    <section id="auth" class="auth-card hidden">
+      <p class="eyebrow">NOSSO CINEMINHA PARTICULAR</p>
+      <h1>O que vamos assistir? <span>♥</span></h1>
+      <p>Entre para guardar todas as indicações que encontramos por aí.</p>
+
+      <form id="auth-form">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" autocomplete="email" required placeholder="voce@exemplo.com">
+
+        <label for="password">Senha</label>
+        <input id="password" type="password" minlength="6" autocomplete="current-password" required placeholder="Sua senha">
+
+        <button class="button primary" type="submit">Entrar</button>
+      </form>
+
+      <p class="hint">Sua sessão fica salva neste dispositivo até você sair. Não salvamos sua senha.</p>
+      <button id="signup" class="button ghost" type="button">Criar minha conta</button>
+      <p id="auth-feedback" class="feedback" role="status"></p>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="hero">
+        <p class="eyebrow">NOSSO CINEMINHA PARTICULAR 🍿</p>
+        <h1>As próximas histórias<br>que vamos viver juntos. <span>♥</span></h1>
+        <p>Encontrou um filme no Reels? Anota aqui. Depois é só procurar no IPTV.</p>
+      </div>
+
+      <div class="stats">
+        <div>
+          <strong id="count-all">0</strong>
+          <span>Na lista</span>
+        </div>
+        <div>
+          <strong id="count-found">0</strong>
+          <span>No IPTV</span>
+        </div>
+        <div>
+          <strong id="count-watched">0</strong>
+          <span>Assistidos</span>
+        </div>
+      </div>
+
+      <section class="panel">
+        <h2><span class="heading-icon">✦</span> Adicionar indicação</h2>
+
+        <form id="add-form">
+          <div class="form-grid">
+            <div>
+              <label for="title">Nome do filme ou série *</label>
+              <input id="title" required maxlength="160" placeholder="Qual título vocês descobriram?">
+            </div>
+
+            <div>
+              <label for="kind">Tipo</label>
+              <select id="kind">
+                <option value="filme">Filme</option>
+                <option value="serie">Série</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div>
+              <label for="reel">Link do Reels (opcional)</label>
+              <input id="reel" type="url" maxlength="1500" placeholder="https://...">
+            </div>
+
+            <div>
+              <label for="note">Observação (opcional)</label>
+              <input id="note" maxlength="300" placeholder="Quem indicou? Algum detalhe?">
+            </div>
+          </div>
+
+          <div class="form-grid status-grid">
+            <div>
+              <label for="availability">📺 Encontramos no IPTV?</label>
+              <select id="availability">
+                <option value="pendente">Ainda não procuramos</option>
+                <option value="sim">Sim, está disponível</option>
+                <option value="nao">Não encontramos</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="progress">🎬 Já assistimos?</label>
+              <select id="progress">
+                <option value="quero">Queremos assistir</option>
+                <option value="assistindo">Estamos assistindo</option>
+                <option value="assistido">Já assistimos</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="lookup-block">
+            <p class="lookup-title">Capa da indicação <span>via TMDB</span></p>
+
+            <p id="lookup-feedback" class="lookup-feedback" role="status" aria-live="polite">
+              Digite pelo menos 3 letras para encontrar a capa.
+            </p>
+
+            <div id="poster-preview" class="poster-preview hidden"></div>
+            <div id="tmdb-results" class="tmdb-results hidden"></div>
+
+            <button id="tmdb-search" class="button ghost lookup-retry" type="button">
+              Pesquisar novamente
+            </button>
+          </div>
+
+          <div class="actions">
+            <button id="add-button" class="button primary" type="submit">
+              + Guardar indicação
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="collection">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">NOSSA COLEÇÃO</p>
+            <h2>🍿 Nosso catálogo de indicações</h2>
+          </div>
+
+          <button class="button secondary" id="random" type="button">
+            Surpreenda a gente ✨
+          </button>
+        </div>
+
+        <div class="filters">
+          <input id="search" aria-label="Buscar na lista" placeholder="Buscar na nossa lista...">
+
+          <select id="filter">
+            <option value="todos">Todos os títulos</option>
+            <option value="pendente">Ainda não procuramos</option>
+            <option value="sim">Disponíveis no IPTV</option>
+            <option value="nao">Não encontrados</option>
+            <option value="assistindo">Assistindo</option>
+            <option value="assistido">Já assistimos</option>
+          </select>
+        </div>
+
+        <p id="list-feedback" class="feedback" role="status"></p>
+        <div id="items" class="items"></div>
+      </section>
+    </section>
+
+    <footer>
+      Feito para nossas noites de filme ♥
+      <span id="tmdb-credit" class="hidden">
+        Dados e imagens: <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>.
+        Este produto usa a API do TMDB, mas não é endossado ou certificado pelo TMDB.
+      </span>
+    </footer>
   </main>
-  <dialog id="edit-dialog"><form id="edit-form"><div class="modal-head"><h2>Atualizar indicação</h2><button type="button" id="close-dialog" class="button ghost">✕</button></div><input id="edit-id" type="hidden"><label for="edit-title">Título</label><input id="edit-title" required maxlength="160"><label for="edit-availability"><span class="label-icon" aria-hidden="true">📺</span> Encontramos no IPTV?</label><select id="edit-availability"><option value="pendente">Ainda não procuramos</option><option value="sim">Sim, disponível</option><option value="nao">Não encontramos</option></select><label for="edit-progress"><span class="label-icon" aria-hidden="true">🎬</span> Já assistimos?</label><select id="edit-progress"><option value="quero">Queremos assistir</option><option value="assistindo">Estamos assistindo</option><option value="assistido">Já assistimos</option></select><label for="edit-note">Observação</label><input id="edit-note" maxlength="300"><label for="edit-reel">Link do Reels</label><input id="edit-reel" type="url" maxlength="1500"><div class="actions"><button class="button primary" type="submit">Salvar alterações</button><button class="button danger" type="button" id="delete-item">Excluir</button></div></form></dialog>
-  <script type="module" src="./js/app.js"></script>
+
+  <dialog id="edit-dialog">
+    <form id="edit-form">
+      <div class="modal-head">
+        <h2>Atualizar indicação</h2>
+        <button type="button" id="close-dialog" class="button ghost">✕</button>
+      </div>
+
+      <input id="edit-id" type="hidden">
+
+      <label for="edit-title">Título</label>
+      <input id="edit-title" required maxlength="160">
+
+      <label for="edit-availability">📺 Encontramos no IPTV?</label>
+      <select id="edit-availability">
+        <option value="pendente">Ainda não procuramos</option>
+        <option value="sim">Sim, disponível</option>
+        <option value="nao">Não encontramos</option>
+      </select>
+
+      <label for="edit-progress">🎬 Já assistimos?</label>
+      <select id="edit-progress">
+        <option value="quero">Queremos assistir</option>
+        <option value="assistindo">Estamos assistindo</option>
+        <option value="assistido">Já assistimos</option>
+      </select>
+
+      <label for="edit-note">Observação</label>
+      <input id="edit-note" maxlength="300">
+
+      <label for="edit-reel">Link do Reels</label>
+      <input id="edit-reel" type="url" maxlength="1500">
+
+      <div class="actions">
+        <button class="button primary" type="submit">Salvar alterações</button>
+        <button class="button danger" type="button" id="delete-item">Excluir</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./js/app.js?v=5"></script>
 </body>
 </html>
