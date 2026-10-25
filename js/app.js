@@ -35,16 +35,197 @@ function validUrl(value) {
   }
 }
 
-let db;
-let items = [];
-let selectedTmdb = null;
-
 function message(id, text) {
   $(id).textContent = text;
 }
 
 function errorText(error) {
   return error?.message || 'Ocorreu um erro. Tente novamente.';
+}
+
+function normalizeTitle(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+    .trim();
+}
+
+let db;
+let items = [];
+let selectedTmdb = null;
+let searchTimer;
+let searchVersion = 0;
+
+function clearPoster() {
+  selectedTmdb = null;
+  $('poster-preview').replaceChildren();
+  show('poster-preview', false);
+}
+
+function displayPoster(result, automatic = false) {
+  const preview = $('poster-preview');
+  preview.replaceChildren();
+
+  const image = document.createElement('img');
+  image.src = `https://image.tmdb.org/t/p/w185${result.poster_path}`;
+  image.alt = `Capa de ${result.title}`;
+  image.loading = 'lazy';
+
+  const details = document.createElement('div');
+
+  const title = document.createElement('strong');
+  title.textContent = result.title;
+
+  const description = document.createElement('p');
+  description.textContent = automatic
+    ? '✓ Capa encontrada automaticamente'
+    : '✓ Capa selecionada';
+
+  details.append(title, description);
+  preview.append(image, details);
+
+  selectedTmdb = {
+    id: result.id,
+    poster_path: result.poster_path
+  };
+
+  show('poster-preview', true);
+}
+
+function resetSearch() {
+  clearTimeout(searchTimer);
+  searchVersion++;
+  clearPoster();
+  $('tmdb-results').replaceChildren();
+  show('tmdb-results', false);
+}
+
+function scheduleTmdbSearch() {
+  resetSearch();
+
+  const title = $('title').value.trim();
+
+  if (title.length < 3) return;
+
+  const version = searchVersion;
+  const kind = $('kind').value;
+
+  searchTimer = setTimeout(() => {
+    void searchTmdb(title, kind, version);
+  }, 700);
+}
+
+async function searchTmdb(title, kind, version) {
+  const results = $('tmdb-results');
+
+  results.textContent = 'Procurando capa...';
+  show('tmdb-results', true);
+
+  try {
+    const { data, error } = await db.functions.invoke('buscar-tmdb', {
+      body: { query: title, kind }
+    });
+
+    if (version !== searchVersion) return;
+
+    if (error) {
+      let detail = error.message;
+
+      if (error.context instanceof Response) {
+        try {
+          const body = await error.context.json();
+          detail = body.error || body.message || detail;
+        } catch {
+          detail = `Erro HTTP ${error.context.status}`;
+        }
+      }
+
+      throw new Error(detail);
+    }
+
+    if (data?.error) throw new Error(data.error);
+
+    if (!Array.isArray(data?.results)) {
+      throw new Error('Resposta inválida da API.');
+    }
+
+    results.replaceChildren();
+
+    const matches = data.results.filter(
+      (item) => item.title && item.poster_path
+    );
+
+    if (!matches.length) {
+      results.textContent =
+        'Nenhuma capa encontrada. Você pode cadastrar manualmente.';
+      return;
+    }
+
+    const exactMatches = matches.filter(
+      (item) => normalizeTitle(item.title) === normalizeTitle(title)
+    );
+
+    if (exactMatches.length === 1) {
+      displayPoster(exactMatches[0], true);
+      show('tmdb-results', false);
+      return;
+    }
+
+    const hint = document.createElement('p');
+    hint.textContent = 'Encontramos estas opções. Escolha a capa correta:';
+    results.append(hint);
+
+    for (const result of matches.slice(0, 5)) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'tmdb-option';
+
+      const image = document.createElement('img');
+      image.src = `https://image.tmdb.org/t/p/w92${result.poster_path}`;
+      image.alt = `Capa de ${result.title}`;
+      image.loading = 'lazy';
+
+      const details = document.createElement('span');
+      details.className = 'tmdb-meta';
+
+      const name = document.createElement('span');
+      name.className = 'tmdb-name';
+      name.textContent = result.title;
+
+      const year = document.createElement('span');
+      year.className = 'tmdb-year';
+      year.textContent =
+        (result.release_date || '').slice(0, 4) || 'Ano não informado';
+
+      const overview = document.createElement('span');
+      overview.className = 'tmdb-overview';
+      overview.textContent =
+        result.overview || 'Sinopse não disponível.';
+
+      details.append(name, year, overview);
+      button.append(image, details);
+
+      button.addEventListener('click', () => {
+        clearTimeout(searchTimer);
+        searchVersion++;
+
+        $('title').value = result.title;
+        displayPoster(result);
+
+        results.replaceChildren();
+        show('tmdb-results', false);
+      });
+
+      results.append(button);
+    }
+  } catch (error) {
+    if (version !== searchVersion) return;
+
+    console.error('Erro na busca TMDB:', error);
+    results.textContent =
+      `Busca indisponível: ${errorText(error)}. O cadastro manual continua disponível.`;
+  }
 }
 
 async function load() {
@@ -65,12 +246,10 @@ async function load() {
 
 function render() {
   $('count-all').textContent = items.length;
-  $('count-found').textContent = items.filter(
-    (item) => item.availability === 'sim'
-  ).length;
-  $('count-watched').textContent = items.filter(
-    (item) => item.progress === 'assistido'
-  ).length;
+  $('count-found').textContent =
+    items.filter((item) => item.availability === 'sim').length;
+  $('count-watched').textContent =
+    items.filter((item) => item.progress === 'assistido').length;
 
   const term = $('search').value.trim().toLocaleLowerCase('pt-BR');
   const filter = $('filter').value;
@@ -95,17 +274,18 @@ function render() {
   if (!visible.length) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = 'Nenhum título encontrado. Que tal adicionar uma indicação?';
+    empty.textContent = 'Nenhuma indicação encontrada.';
     container.append(empty);
     return;
   }
 
   for (const item of visible) {
-    const poster = item.poster_path &&
+    const poster =
+      item.poster_path &&
       /^\/[\w/-]+\.(jpg|png|webp)$/i.test(item.poster_path)
-      ? `<img src="https://image.tmdb.org/t/p/w342${item.poster_path}"
-          alt="Capa de ${escapeHtml(item.title)}" loading="lazy">`
-      : '🍿';
+        ? `<img src="https://image.tmdb.org/t/p/w342${item.poster_path}"
+             alt="Capa de ${escapeHtml(item.title)}" loading="lazy">`
+        : '🍿';
 
     const reel = validUrl(item.reel_url);
 
@@ -117,7 +297,6 @@ function render() {
       <div class="item-body">
         <h3>${escapeHtml(item.title)}</h3>
         <p>${item.kind === 'serie' ? 'Série' : 'Filme'}</p>
-
         <div class="pills">
           <span class="pill ${item.availability === 'sim' ? 'ok' : ''}">
             ${availabilityNames[item.availability] || 'A procurar'}
@@ -126,26 +305,24 @@ function render() {
             ${progressNames[item.progress] || 'Quero assistir'}
           </span>
         </div>
-
         ${reel ? `
           <p>
             <a href="${escapeHtml(reel)}"
-               target="_blank"
-               rel="noopener noreferrer">
+               target="_blank" rel="noopener noreferrer">
               Ver indicação ↗
             </a>
           </p>
         ` : ''}
-
         <button class="button secondary edit" type="button">
           Editar
         </button>
       </div>
     `;
 
-    card.querySelector('.edit').addEventListener('click', () => {
-      openEdit(item.id);
-    });
+    card.querySelector('.edit').addEventListener(
+      'click',
+      () => openEdit(item.id)
+    );
 
     container.append(card);
   }
@@ -208,11 +385,7 @@ async function addItem(event) {
   event.preventDefault();
 
   const title = $('title').value.trim();
-
-  if (!title) {
-    message('list-feedback', 'Informe o nome do filme ou série.');
-    return;
-  }
+  if (!title) return;
 
   $('add-button').disabled = true;
 
@@ -235,8 +408,7 @@ async function addItem(event) {
   }
 
   $('add-form').reset();
-  selectedTmdb = null;
-  show('tmdb-results', false);
+  resetSearch();
 
   await load();
   message('list-feedback', 'Indicação salva com sucesso!');
@@ -296,118 +468,6 @@ async function deleteItem() {
   await load();
 }
 
-async function searchTmdb() {
-  const title = $('title').value.trim();
-  const results = $('tmdb-results');
-  const button = $('tmdb-search');
-
-  if (!title) {
-    message('list-feedback', 'Digite o nome de um filme ou série.');
-    return;
-  }
-
-  button.disabled = true;
-  results.replaceChildren();
-  show('tmdb-results', true);
-  results.textContent = 'Buscando filmes e séries...';
-
-  try {
-    const { data, error } = await db.functions.invoke('buscar-tmdb', {
-      body: {
-        query: title,
-        kind: $('kind').value
-      }
-    });
-
-    if (error) {
-      let detail = error.message;
-
-      if (error.context instanceof Response) {
-        const response = error.context;
-
-        try {
-          const body = await response.json();
-          detail = body.error || body.message || detail;
-        } catch {
-          detail = `Erro HTTP ${response.status}: ${detail}`;
-        }
-      }
-
-      throw new Error(detail);
-    }
-
-    if (data?.error) {
-      throw new Error(data.error);
-    }
-
-    if (!Array.isArray(data?.results)) {
-      throw new Error('A API retornou uma resposta inválida.');
-    }
-
-    results.replaceChildren();
-
-    if (!data.results.length) {
-      results.textContent = 'Nenhum resultado encontrado. Você pode cadastrar manualmente.';
-      return;
-    }
-
-    for (const result of data.results.slice(0, 5)) {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'tmdb-option';
-
-      const titleText = result.title || 'Título desconhecido';
-      const year = (result.release_date || '').slice(0, 4);
-
-      if (result.poster_path) {
-        const image = document.createElement('img');
-        image.src = `https://image.tmdb.org/t/p/w92${result.poster_path}`;
-        image.alt = `Capa de ${titleText}`;
-        image.loading = 'lazy';
-        option.append(image);
-      }
-
-      const meta = document.createElement('span');
-      meta.className = 'tmdb-meta';
-
-      const name = document.createElement('span');
-      name.className = 'tmdb-name';
-      name.textContent = titleText;
-
-      const releaseYear = document.createElement('span');
-      releaseYear.className = 'tmdb-year';
-      releaseYear.textContent = year || 'Ano não informado';
-
-      const overview = document.createElement('span');
-      overview.className = 'tmdb-overview';
-      overview.textContent = result.overview || 'Sinopse não disponível.';
-
-      meta.append(name, releaseYear, overview);
-      option.append(meta);
-
-      option.addEventListener('click', () => {
-        selectedTmdb = {
-          id: result.id,
-          poster_path: result.poster_path
-        };
-
-        $('title').value = titleText;
-        show('tmdb-results', false);
-        message('list-feedback', 'Filme selecionado! Agora você pode salvar.');
-      });
-
-      results.append(option);
-    }
-  } catch (error) {
-    console.error('Erro na integração TMDB:', error);
-
-    results.textContent =
-      `Busca indisponível: ${errorText(error)}. Você pode cadastrar manualmente.`;
-  } finally {
-    button.disabled = false;
-  }
-}
-
 function randomPick() {
   const eligible = items.filter(
     (item) =>
@@ -435,6 +495,12 @@ async function init() {
     config.supabasePublishableKey
   );
 
+  const preview = document.createElement('div');
+  preview.id = 'poster-preview';
+  preview.className = 'poster-preview hidden';
+
+  $('tmdb-results').before(preview);
+
   $('auth-form').addEventListener('submit', submitAuth);
   $('signup').addEventListener('click', signup);
 
@@ -454,19 +520,11 @@ async function init() {
   $('filter').addEventListener('change', render);
   $('random').addEventListener('click', randomPick);
 
-  $('title').addEventListener('input', () => {
-    selectedTmdb = null;
-  });
+  $('title').addEventListener('input', scheduleTmdbSearch);
+  $('kind').addEventListener('change', scheduleTmdbSearch);
 
-  $('kind').addEventListener('change', () => {
-    selectedTmdb = null;
-    show('tmdb-results', false);
-  });
-
-  show('tmdb-search', true);
+  show('tmdb-search', false);
   show('tmdb-credit', true);
-
-  $('tmdb-search').addEventListener('click', searchTmdb);
 
   db.auth.onAuthStateChange((_event, session) => {
     void setAuth(session);
@@ -479,6 +537,7 @@ async function init() {
 init().catch((error) => {
   console.error('Erro ao iniciar Nossa Lista:', error);
   show('setup', true);
+
   $('setup').append(
     document.createTextNode(` Erro ao iniciar: ${errorText(error)}`)
   );

@@ -137,3 +137,98 @@ dialog input, dialog select { margin-bottom: 11px; }
 .heading-icon { font-size: .95em; margin-right: 5px; }
 .status-grid select { border-color: #75404f; }
 .status-grid select:focus { border-color: #ff7887; }
+
+/* Preview do pôster */
+
+.poster-preview {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 16px;
+  background: linear-gradient(135deg, #211015, #130c11);
+  border: 1px solid #61303c;
+  border-radius: 14px;
+}
+
+.poster-preview.hidden {
+  display: none;
+}
+
+.poster-preview img {
+  width: 90px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 9px;
+}
+
+.poster-preview strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 17px;
+}
+
+.poster-preview p {
+  margin: 0;
+  color: #ff9caa;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+}
+
+.tmdb-results {
+  margin-top: 14px;
+}
+
+.tmdb-option {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: #1b1118;
+  color: #fff;
+  border: 1px solid #4b2934;
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tmdb-option:hover {
+  border-color: #e50914;
+  background: #29151e;
+}
+
+.tmdb-option img {
+  width: 54px;
+  border-radius: 6px;
+}
+
+.tmdb-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tmdb-name {
+  font-weight: 700;
+}
+
+.tmdb-year,
+.tmdb-overview {
+  color: #cdbdc5;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .poster-preview {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .poster-preview img {
+    width: 72px;
+  }
+}
