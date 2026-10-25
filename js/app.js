@@ -73,10 +73,12 @@ function resetLookup() {
 function scheduleLookup() {
   resetLookup();
   const query = $('title').value.trim();
-  if (query.length < 3) return;
+  if (query.length < 3) {
+    message('lookup-feedback', 'Digite ao menos 3 letras para procurar filmes e séries.');
+    return;
+  }
   const version = searchVersion;
-  const kind = $('kind').value;
-  searchTimer = setTimeout(() => void lookupTmdb(query, kind, version), 650);
+  searchTimer = setTimeout(() => void lookupTmdb(query, version), 650);
 }
 
 function renderResults(results, query) {
@@ -89,11 +91,11 @@ function renderResults(results, query) {
   }
   const exact = results.filter((item) => normalize(item.title) === normalize(query));
   // Nomes repetidos não são decididos automaticamente: um filme de outro ano pode ter o mesmo nome.
-  if (exact.length === 1) setPoster(exact[0]);
+  if (exact.length === 1) { setPoster(exact[0]); $('kind').value = exact[0].kind; }
   message('lookup-feedback', exact.length === 1 ? 'Encontramos uma capa. Confira antes de salvar.' : 'Escolha a produção correta pela capa e pelo ano.');
   for (const result of results) {
     const option = document.createElement('button');
-    option.type = 'button'; option.className = 'tmdb-option';
+    option.type = 'button'; option.className = `tmdb-option ${result.kind === 'serie' ? 'result-series' : 'result-movie'}`;
     option.setAttribute('aria-label', `Selecionar ${result.title}, ${(result.release_date || '').slice(0, 4) || 'ano não informado'}`);
     const image = document.createElement('img');
     image.src = posterUrl(result.poster_path, 'w92'); image.alt = ''; image.loading = 'lazy';
@@ -101,11 +103,13 @@ function renderResults(results, query) {
     const title = document.createElement('strong'); title.className = 'tmdb-name'; title.textContent = result.title;
     const year = document.createElement('span'); year.className = 'tmdb-year'; year.textContent = (result.release_date || '').slice(0, 4) || 'Ano não informado';
     const synopsis = document.createElement('span'); synopsis.className = 'tmdb-overview'; synopsis.textContent = result.overview || 'Sinopse não disponível.';
-    desc.append(title, year, synopsis);
+    const kindBadge = document.createElement('span'); kindBadge.className = 'result-kind'; kindBadge.textContent = result.kind === 'serie' ? '📺 Série' : '🎬 Filme';
+    desc.append(kindBadge, title, year, synopsis);
     option.append(image, desc);
     option.addEventListener('click', () => {
       searchVersion += 1;
       $('title').value = result.title;
+      $('kind').value = result.kind;
       setPoster(result);
       show('tmdb-results', false);
       message('lookup-feedback', 'Capa selecionada. Você já pode guardar a indicação.');
@@ -115,22 +119,32 @@ function renderResults(results, query) {
   show('tmdb-results', true);
 }
 
-async function lookupTmdb(query, kind, version) {
-  message('lookup-feedback', 'Pesquisando capas...');
+async function lookupTmdb(query, version) {
+  if (query.length < 3) return;
+  message('lookup-feedback', 'Pesquisando filmes e séries...');
   try {
-    const { data, error } = await db.functions.invoke('buscar-tmdb', { body: { query, kind } });
+    const kinds = ['filme', 'serie'];
+    const responses = await Promise.all(kinds.map(async (kind) => {
+      const { data, error } = await db.functions.invoke('buscar-tmdb', { body: { query, kind } });
+      if (error) {
+        const body = error.context instanceof Response
+          ? await error.context.clone().json().catch(() => null) : null;
+        throw new Error(body?.error || body?.message || error.message);
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!Array.isArray(data?.results)) throw new Error('Resposta inesperada da busca.');
+      return data.results.map((result) => ({ ...result, kind }));
+    }));
     if (version !== searchVersion) return;
-    if (error) {
-      const body = error.context instanceof Response ? await error.context.clone().json().catch(() => null) : null;
-      throw new Error(body?.error || body?.message || error.message);
-    }
-    if (data?.error) throw new Error(data.error);
-    if (!Array.isArray(data?.results)) throw new Error('Resposta inesperada da busca.');
     const unique = new Set();
-    searchResults = data.results.filter((result) => {
-      const key = `${result.id}-${result.title}`;
+    searchResults = responses.flat().filter((result) => {
+      const key = `${result.kind}-${result.id}`;
       if (!result.title || !validPoster(result.poster_path) || unique.has(key)) return false;
-      unique.add(key); return true;
+      unique.add(key);
+      return true;
+    }).sort((first, second) => {
+      const score = (item) => normalize(item.title) === normalize(query) ? 2 : normalize(item.title).startsWith(normalize(query)) ? 1 : 0;
+      return score(second) - score(first);
     });
     renderResults(searchResults, query);
   } catch (error) {
@@ -148,14 +162,28 @@ async function load() {
   if ($('stats-dialog').open && activeStatGroup) openStatsDialog(activeStatGroup);
 }
 
+let selectedType = 'todos';
+let selectedStatus = 'todos';
+
+function toggleFilter(button, group) {
+  const key = group === 'type' ? 'type' : 'status';
+  const next = button.dataset[key];
+  if (group === 'type') selectedType = selectedType === next ? 'todos' : next;
+  else selectedStatus = selectedStatus === next ? 'todos' : next;
+  document.querySelectorAll(`[data-${key}]`).forEach((chip) => {
+    chip.setAttribute('aria-pressed', String(chip.dataset[key] === (group === 'type' ? selectedType : selectedStatus)));
+  });
+  render();
+}
+
 function render() {
   $('count-all').textContent = items.length;
   $('count-found').textContent = items.filter((item) => item.availability === 'sim').length;
   $('count-watched').textContent = items.filter((item) => item.progress === 'assistido').length;
   $('count-favorites').textContent = items.filter((item) => item.is_favorite === true).length;
   const term = normalize($('search').value);
-  const filter = $('filter').value;
-  const type = $('type-filter').value;
+  const filter = selectedStatus;
+  const type = selectedType;
   const visible = items.filter((item) => {
     const matchesName = normalize(item.title).includes(term);
     const matchesType = type === 'todos' || item.kind === type;
@@ -417,6 +445,18 @@ let voiceActive = false;
 function initVoiceInput() {
   const button = $('voice-title');
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const isiOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isiOS) {
+    button.title = 'Usar ditado do teclado do iPhone';
+    button.setAttribute('aria-label', 'Abrir teclado para usar o ditado do iPhone');
+    button.addEventListener('click', () => {
+      $('title').focus();
+      message('voice-feedback', 'No teclado do iPhone, toque no microfone de ditado para falar o título.');
+    });
+    message('voice-feedback', 'No iPhone, use o microfone do teclado para ditar o título.');
+    return;
+  }
 
   if (!Recognition) {
     button.disabled = true;
@@ -495,9 +535,9 @@ async function init() {
   $('remove-poster').addEventListener('click', () => { editPoster = { id: null, poster_path: null }; renderEditPoster(); closePosterDialog(); });
   $('poster-dialog').addEventListener('close', () => { clearTimeout(posterModalTimer); posterModalVersion++; });
   $('search').addEventListener('input', render);
-  $('filter').addEventListener('change', render);
-  $('type-filter').addEventListener('change', render);
-  $('clear-filters').addEventListener('click', () => { $('search').value = ''; $('filter').value = 'todos'; $('type-filter').value = 'todos'; render(); });
+  document.querySelectorAll('[data-type]').forEach((chip) => chip.addEventListener('click', () => toggleFilter(chip, 'type')));
+  document.querySelectorAll('[data-status]').forEach((chip) => chip.addEventListener('click', () => toggleFilter(chip, 'status')));
+  $('clear-filters').addEventListener('click', () => { $('search').value = ''; selectedType = 'todos'; selectedStatus = 'todos'; document.querySelectorAll('.filter-chip').forEach((chip) => chip.setAttribute('aria-pressed', 'false')); render(); });
   $('random').addEventListener('click', randomPick);
   document.querySelectorAll('.stat-card').forEach((card) => {
     card.addEventListener('click', () => openStatsDialog(card.dataset.group));
@@ -505,8 +545,8 @@ async function init() {
   $('close-stats-dialog').addEventListener('click', () => $('stats-dialog').close());
   initVoiceInput();
   $('title').addEventListener('input', scheduleLookup);
-  $('kind').addEventListener('change', scheduleLookup);
-  $('tmdb-search').addEventListener('click', () => { clearTimeout(searchTimer); void lookupTmdb($('title').value.trim(), $('kind').value, ++searchVersion); });
+  $('kind').addEventListener('change', () => { if (!selectedTmdb) scheduleLookup(); });
+  $('tmdb-search').addEventListener('click', () => { clearTimeout(searchTimer); void lookupTmdb($('title').value.trim(), ++searchVersion); });
   show('tmdb-credit', true);
   db.auth.onAuthStateChange((_event, session) => { setTimeout(() => void setAuth(session), 0); });
   const { data: { session } } = await db.auth.getSession();
