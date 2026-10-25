@@ -102,7 +102,7 @@ function renderResults(results, query) {
     const title = document.createElement('strong'); title.className = 'tmdb-name'; title.textContent = result.title;
     const year = document.createElement('span'); year.className = 'tmdb-year'; year.textContent = (result.release_date || '').slice(0, 4) || 'Ano não informado';
     const synopsis = document.createElement('span'); synopsis.className = 'tmdb-overview'; synopsis.textContent = result.overview || 'Sinopse não disponível.';
-    const kindBadge = document.createElement('span'); kindBadge.className = 'result-kind'; kindBadge.textContent = result.kind === 'serie' ? '📺 Série' : '🎬 Filme';
+    const kindBadge = document.createElement('span'); kindBadge.className = 'result-kind'; kindBadge.textContent = result.kind === 'serie' ? 'Série' : 'Filme';
     desc.append(kindBadge, title, year, synopsis);
     option.append(image, desc);
     option.addEventListener('click', () => {
@@ -121,7 +121,7 @@ function renderResults(results, query) {
 
 async function lookupTmdb(query, version) {
   if (query.length < 3) return;
-  message('lookup-feedback', 'Pesquisando filmes e séries...');
+  $('lookup-feedback').innerHTML = '<span class="popcorn-loader" aria-hidden="true"><svg class="ui-icon"><use href="#icon-popcorn"/></svg></span> Pesquisando filmes e séries...';
   try {
     const kinds = ['filme', 'serie'];
     const responses = await Promise.all(kinds.map(async (kind) => {
@@ -196,13 +196,18 @@ function render() {
   const root = $('items'); root.replaceChildren();
   if (!visible.length) {
     const empty = document.createElement('div'); empty.className = 'empty';
-    empty.textContent = items.length ? 'Nenhum título corresponde aos filtros.' : 'Sua próxima indicação começa aqui. Adicione o primeiro título!';
+    const icon = document.createElement('div');
+    icon.className = 'empty-cinema-icon';
+    icon.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-film"/></svg>';
+    const text = document.createElement('p');
+    text.textContent = items.length ? 'Nenhum título corresponde aos filtros.' : 'Seu cineminha ainda está vazio. Adicione a primeira indicação!';
+    empty.append(icon, text);
     root.append(empty); return;
   }
   for (const item of visible) {
     const poster = validPoster(item.poster_path) ? `<img src="${posterUrl(item.poster_path)}" alt="Capa de ${escapeHtml(item.title)}" loading="lazy">` : '<span aria-hidden="true">🍿</span>';
     const card = document.createElement('article'); card.className = `item ${item.kind === 'serie' ? 'is-series' : 'is-movie'}`;
-    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type"><span class="type-dot" aria-hidden="true"></span>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'Não procurado'}</span><span class="pill">${labels[item.progress] || 'Para assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill"><svg class="favorite-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9L12 3Z"/></svg> Favorito</span>' : ''}</div><button class="button secondary edit" type="button">Editar indicação</button></div>`;
+    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type"><svg class="ui-icon" aria-hidden="true"><use href="#icon-${item.kind === 'serie' ? 'series' : 'film'}"/></svg>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'Não procurado'}</span><span class="pill">${labels[item.progress] || 'Para assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill">Favorito <svg class="ui-icon favorite-icon" aria-hidden="true"><use href="#icon-heart"/></svg></span>' : ''}</div><button class="button secondary edit" type="button">Editar indicação</button></div>`;
     card.querySelector('.edit').addEventListener('click', () => openEdit(item.id));
     root.append(card);
   }
@@ -256,7 +261,7 @@ function openStatsDialog(group) {
     const title = document.createElement('strong');
     title.textContent = item.title;
     const status = document.createElement('small');
-    status.textContent = `${item.kind === 'serie' ? 'Série' : 'Filme'} · ${labels[item.availability] || 'Não procurado'} · ${labels[item.progress] || 'Para assistir'}${item.is_favorite ? ' · ★ Favorito' : ''}`;
+    status.textContent = `${item.kind === 'serie' ? 'Série' : 'Filme'} · ${labels[item.availability] || 'Não procurado'} · ${labels[item.progress] || 'Para assistir'}${item.is_favorite ? ' · Favorito' : ''}`;
     details.append(title, status);
     const button = document.createElement('button');
     button.type = 'button';
@@ -307,6 +312,11 @@ function setChoice(field, value) {
   $(field).value = value;
   syncChoiceChips(field);
   if (field === 'kind' && !selectedTmdb) scheduleLookup();
+  if (field === 'edit-kind') {
+    const series = value === 'serie';
+    $('edit-dialog').classList.toggle('edit-series', series);
+    $('edit-dialog').classList.toggle('edit-movie', !series);
+  }
 }
 
 async function addItem(event) {
@@ -320,13 +330,17 @@ async function addItem(event) {
   $('add-button').disabled = false;
   if (error) { message('list-feedback', `Erro ao salvar: ${errorText(error)}`); return; }
   $('add-form').reset(); ['kind', 'availability', 'progress'].forEach(syncChoiceChips); resetLookup(); await load();
-  message('list-feedback', 'Indicação guardada na lista!');
+  $('list-feedback').innerHTML = '<span class="success-mark" aria-hidden="true"><svg class="ui-icon"><use href="#icon-check"/></svg></span> Indicação guardada na lista!';
 }
 
 function openEdit(id) {
   const item = items.find((entry) => entry.id === id); if (!item) return;
   $('edit-id').value = item.id; $('edit-title').value = item.title;
+  $('edit-kind').value = item.kind;
   $('edit-availability').value = item.availability; $('edit-progress').value = item.progress;
+  ['edit-kind', 'edit-availability', 'edit-progress'].forEach(syncChoiceChips);
+  $('edit-dialog').classList.toggle('edit-series', item.kind === 'serie');
+  $('edit-dialog').classList.toggle('edit-movie', item.kind !== 'serie');
   $('edit-favorite').checked = item.is_favorite === true;
   editPoster = { id: item.tmdb_id ?? null, poster_path: item.poster_path ?? null };
   renderEditPoster();
@@ -373,7 +387,7 @@ async function searchEditPosters(query, version) {
   try {
     const item = items.find((entry) => String(entry.id) === $('edit-id').value);
     const { data, error } = await db.functions.invoke('buscar-tmdb', {
-      body: { query, kind: item?.kind || 'filme' }
+      body: { query, kind: $('edit-kind').value || item?.kind || 'filme' }
     });
     if (version !== posterModalVersion || !$('poster-dialog').open) return;
     if (error) {
@@ -426,12 +440,13 @@ function closePosterDialog() {
 
 async function updateItem(event) {
   event.preventDefault();
-  const { error } = await db.from('titles').update({ title: $('edit-title').value.trim(),
+  const { error } = await db.from('titles').update({ title: $('edit-title').value.trim(), kind: $('edit-kind').value,
     availability: $('edit-availability').value, progress: $('edit-progress').value,
     tmdb_id: editPoster?.id ?? null, poster_path: editPoster?.poster_path ?? null,
     is_favorite: $('edit-favorite').checked }).eq('id', $('edit-id').value);
   if (error) { alert(`Não foi possível salvar: ${errorText(error)}`); return; }
   $('edit-dialog').close(); await load();
+  $('list-feedback').innerHTML = '<span class="success-mark" aria-hidden="true"><svg class="ui-icon"><use href="#icon-check"/></svg></span> Alterações salvas com sucesso!';
 }
 
 async function deleteItem() {
@@ -441,26 +456,36 @@ async function deleteItem() {
   $('edit-dialog').close(); await load();
 }
 
+let randomTimer = null;
 function randomPick() {
   const result = $('random-result');
+  const button = $('random');
   const available = items.filter((item) => item.availability === 'sim' && item.progress !== 'assistido');
+  clearTimeout(randomTimer);
   result.replaceChildren();
   show('random-result', true);
-
   if (!available.length) {
-    result.textContent = 'Nenhum título disponível para sortear. Marque um filme ou série como disponível no IPTV.';
+    result.textContent = 'Nenhum título disponível para sortear. Marque primeiro um filme ou série como disponível no IPTV.';
     return;
   }
-
+  button.disabled = true;
+  result.innerHTML = '<div class="sort-loading" aria-label="Sorteando"><svg class="ui-icon dice-icon" aria-hidden="true"><use href="#icon-dice"/></svg><span>Preparando a próxima sessão...</span></div>';
   const chosen = available[Math.floor(Math.random() * available.length)];
-  const kicker = document.createElement('span');
-  kicker.className = 'random-kicker';
-  kicker.textContent = '🍿 Nossa sugestão para hoje';
-  const title = document.createElement('strong');
-  title.textContent = chosen.title;
-  const kind = document.createElement('small');
-  kind.textContent = chosen.kind === 'serie' ? '📺 Série' : '🎬 Filme';
-  result.append(kicker, title, kind);
+  randomTimer = setTimeout(() => {
+    result.replaceChildren();
+    const kicker = document.createElement('span');
+    kicker.className = 'random-kicker';
+    kicker.textContent = 'Nossa sugestão para hoje';
+    const title = document.createElement('strong');
+    title.textContent = chosen.title;
+    const kind = document.createElement('small');
+    kind.textContent = chosen.kind === 'serie' ? 'Série' : 'Filme';
+    result.append(kicker, title, kind);
+    result.classList.remove('reveal');
+    void result.offsetWidth;
+    result.classList.add('reveal');
+    button.disabled = false;
+  }, 850);
 }
 
 let voiceRecognition = null;

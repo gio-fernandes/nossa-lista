@@ -401,3 +401,48 @@ footer { border-top: 1px solid rgba(255,255,255,.07); }
 @media (max-width: 700px) {
   #add-form .choice-chip, .collection .filter-chip { white-space: normal; min-height: 44px; }
 }
+
+
+/* V10: chips também na edição, com tema por tipo */
+.icon-sprite { position:absolute; width:0; height:0; overflow:hidden; }
+.ui-icon { width:17px !important; height:17px !important; min-width:17px; max-width:17px; max-height:17px; display:inline-block; vertical-align:middle; flex:none; margin:0; }
+.choice-chip, .filter-chip { display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+.label-icon .ui-icon { width:16px !important; height:16px !important; }
+.favorite-checkbox > span { display:inline-flex; gap:8px; align-items:center; }
+#edit-dialog select[hidden], #edit-dialog select.visually-hidden { display:none !important; }
+#edit-dialog .choice-chips { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 18px; align-items:center; }
+#edit-dialog .choice-chip { width:auto; min-height:42px; padding:10px 14px; border:1px solid var(--edit-border,#874155); border-radius:999px; background:var(--edit-chip,#321823); color:#f9e9eb; font:700 .88rem/1.25 'Roboto',sans-serif; white-space:nowrap; }
+#edit-dialog .choice-chip[aria-pressed="true"] { background:var(--edit-accent,#d71939); border-color:var(--edit-active,#ff6176); color:white; box-shadow:0 0 0 2px #ffffff13; }
+#edit-dialog .choice-chip:focus-visible { outline:3px solid #ffd0d6; outline-offset:2px; }
+#edit-dialog { --edit-accent:#bc1c40; --edit-border:#77354a; --edit-active:#ff5d7a; --edit-chip:#311924; border:1px solid var(--edit-border); background:linear-gradient(155deg,#30121e,#181016 65%); box-shadow:0 22px 75px #000a; }
+#edit-dialog.edit-series { --edit-accent:#126e79; --edit-border:#2b7e89; --edit-active:#67d6df; --edit-chip:#19343b; background:linear-gradient(155deg,#12333c,#101d24 65%); }
+#edit-dialog.edit-series input:not([type=checkbox]), #edit-dialog.edit-series .edit-poster-row { border-color:#3d7c87; }
+#edit-dialog.edit-series .primary { background:linear-gradient(110deg,#168a98,#075c69); }
+#edit-dialog.edit-series .secondary { background:#1a414b; border-color:#388996; }
+#edit-dialog.edit-series .field-label { color:#d5f7fa; }
+#edit-dialog .edit-kind-field { margin:16px 0 8px; }
+#edit-dialog .favorite-checkbox { margin-top:5px; margin-bottom:20px; }
+.stat-card .ui-icon { width:22px !important; height:22px !important; max-width:22px; max-height:22px; }
+.filter-chip .favorite-icon { margin-left:2px; margin-right:0; }
+.favorite-pill { display:inline-flex; align-items:center; gap:5px; }
+.favorite-pill .favorite-icon { margin:0; }
+.brand-logo { transition:transform .3s ease; }
+.brand:hover .brand-logo { transform:rotate(-8deg) translateY(-3px); }
+.item { transition:transform .22s ease, box-shadow .22s ease; }
+.item:hover { transform:translateY(-4px); box-shadow:0 15px 35px #0006; }
+.popcorn-loader { display:inline-flex; vertical-align:middle; color:#ff728b; animation:popcorn-bounce .75s ease-in-out infinite alternate; }
+.success-mark { color:#7febae; display:inline-flex; vertical-align:middle; animation:pop-in .5s cubic-bezier(.2,1.7,.3,1); }
+.sort-loading { display:flex; align-items:center; gap:12px; color:#ffd6de; }
+.sort-loading .dice-icon { width:28px !important; height:28px !important; animation:dice-roll .7s ease-in-out infinite; }
+.random-result.reveal { animation:pop-in .45s cubic-bezier(.2,1.2,.3,1); }
+@keyframes popcorn-bounce { from { transform:translateY(2px) rotate(-9deg) scale(.95) } to { transform:translateY(-3px) rotate(8deg) scale(1.07) } }
+@keyframes dice-roll { 0% {transform:rotate(-22deg) scale(.93)} 50% {transform:rotate(28deg) scale(1.1)} 100% {transform:rotate(-22deg) scale(.93)} }
+@keyframes pop-in { from {opacity:0;transform:translateY(7px) scale(.92)} to {opacity:1;transform:translateY(0) scale(1)} }
+@media (prefers-reduced-motion: reduce) { .popcorn-loader,.success-mark,.sort-loading .dice-icon,.random-result.reveal {animation:none} .brand-logo,.item {transition:none} }
+
+/* Estado vazio e indicador de favoritos */
+.empty-cinema-icon { display:grid; place-items:center; width:72px; height:72px; margin:0 auto 14px; border-radius:20px; color:#ff7285; background:#351722; animation:popcorn-bounce 1.7s ease-in-out infinite alternate; }
+.empty-cinema-icon .ui-icon { width:42px !important; height:42px !important; max-width:42px; max-height:42px; }
+.empty p { margin:0; }
+.favorite-stat-icon { margin-top:5px; color:#ff8193; }
+@media(prefers-reduced-motion:reduce) { .empty-cinema-icon { animation:none; } }
