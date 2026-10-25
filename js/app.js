@@ -3,14 +3,13 @@ import { config } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, visible) => $(id).classList.toggle('hidden', !visible);
-const labels = { pendente: 'A procurar', sim: 'Disponível no IPTV', nao: 'Não encontrado', quero: 'Quero assistir', assistindo: 'Assistindo', assistido: 'Assistido' };
+const labels = { pendente: 'Não procurado', sim: 'Disponível', nao: 'Indisponível', quero: 'Para assistir', assistindo: 'Assistindo', assistido: 'Já vimos' };
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 const validPoster = (path) => typeof path === 'string' && /^\/[\w/-]+\.(jpg|jpeg|png|webp)$/i.test(path);
 const posterUrl = (path, size = 'w342') => `https://image.tmdb.org/t/p/${size}${path}`;
 const message = (id, text) => { $(id).textContent = text; };
 const errorText = (error) => error?.message || 'Ocorreu um erro. Tente novamente.';
-function validUrl(value) { try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } }
 
 let db;
 let items = [];
@@ -91,7 +90,7 @@ function renderResults(results, query) {
   }
   const exact = results.filter((item) => normalize(item.title) === normalize(query));
   // Nomes repetidos não são decididos automaticamente: um filme de outro ano pode ter o mesmo nome.
-  if (exact.length === 1) { setPoster(exact[0]); $('kind').value = exact[0].kind; }
+  if (exact.length === 1) { setPoster(exact[0]); $('kind').value = exact[0].kind; syncChoiceChips('kind'); }
   message('lookup-feedback', exact.length === 1 ? 'Encontramos uma capa. Confira antes de salvar.' : 'Escolha a produção correta pela capa e pelo ano.');
   for (const result of results) {
     const option = document.createElement('button');
@@ -110,6 +109,7 @@ function renderResults(results, query) {
       searchVersion += 1;
       $('title').value = result.title;
       $('kind').value = result.kind;
+      syncChoiceChips('kind');
       setPoster(result);
       show('tmdb-results', false);
       message('lookup-feedback', 'Capa selecionada. Você já pode guardar a indicação.');
@@ -200,10 +200,9 @@ function render() {
     root.append(empty); return;
   }
   for (const item of visible) {
-    const reel = validUrl(item.reel_url);
     const poster = validPoster(item.poster_path) ? `<img src="${posterUrl(item.poster_path)}" alt="Capa de ${escapeHtml(item.title)}" loading="lazy">` : '<span aria-hidden="true">🍿</span>';
     const card = document.createElement('article'); card.className = `item ${item.kind === 'serie' ? 'is-series' : 'is-movie'}`;
-    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type"><span class="type-dot" aria-hidden="true"></span>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'A procurar'}</span><span class="pill">${labels[item.progress] || 'Quero assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill">♥ Favorito</span>' : ''}</div>${reel ? `<a class="reel-link" href="${escapeHtml(reel)}" target="_blank" rel="noopener noreferrer">Ver Reels ↗</a>` : ''}<button class="button secondary edit" type="button">Editar indicação</button></div>`;
+    card.innerHTML = `<div class="poster">${poster}</div><div class="item-body"><p class="item-type"><span class="type-dot" aria-hidden="true"></span>${item.kind === 'serie' ? 'Série' : 'Filme'}</p><h3>${escapeHtml(item.title)}</h3><div class="pills"><span class="pill ${item.availability === 'sim' ? 'ok' : ''}">${labels[item.availability] || 'Não procurado'}</span><span class="pill">${labels[item.progress] || 'Para assistir'}</span>${item.is_favorite ? '<span class="pill favorite-pill"><svg class="favorite-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.8 6.4.9-4.6 4.5 1.1 6.3-5.7-3-5.7 3 1.1-6.3-4.6-4.5 6.4-.9L12 3Z"/></svg> Favorito</span>' : ''}</div><button class="button secondary edit" type="button">Editar indicação</button></div>`;
     card.querySelector('.edit').addEventListener('click', () => openEdit(item.id));
     root.append(card);
   }
@@ -213,7 +212,7 @@ function render() {
 const statGroupNames = {
   todos: 'Todas as indicações',
   sim: 'Disponíveis no IPTV',
-  assistido: 'Já assistimos',
+  assistido: 'Já vimos',
   favoritos: 'Nossos favoritos'
 };
 let activeStatGroup = null;
@@ -257,7 +256,7 @@ function openStatsDialog(group) {
     const title = document.createElement('strong');
     title.textContent = item.title;
     const status = document.createElement('small');
-    status.textContent = `${item.kind === 'serie' ? 'Série' : 'Filme'} · ${labels[item.availability] || 'A procurar'} · ${labels[item.progress] || 'Quero assistir'}${item.is_favorite ? ' · ♥ Favorito' : ''}`;
+    status.textContent = `${item.kind === 'serie' ? 'Série' : 'Filme'} · ${labels[item.availability] || 'Não procurado'} · ${labels[item.progress] || 'Para assistir'}${item.is_favorite ? ' · ★ Favorito' : ''}`;
     details.append(title, status);
     const button = document.createElement('button');
     button.type = 'button';
@@ -297,18 +296,30 @@ async function signup() {
   message('auth-feedback', error ? errorText(error) : 'Confira seu e-mail para confirmar o cadastro, se necessário.');
 }
 
+function syncChoiceChips(field) {
+  const selected = $(field).value;
+  document.querySelectorAll(`.choice-chip[data-field="${field}"]`).forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.value === selected));
+  });
+}
+
+function setChoice(field, value) {
+  $(field).value = value;
+  syncChoiceChips(field);
+  if (field === 'kind' && !selectedTmdb) scheduleLookup();
+}
+
 async function addItem(event) {
   event.preventDefault(); const title = $('title').value.trim();
   if (!title) return;
   $('add-button').disabled = true;
   const { error } = await db.from('titles').insert({ title, kind: $('kind').value,
-    reel_url: $('reel').value.trim() || null, note: $('note').value.trim() || null,
     availability: $('availability').value, progress: $('progress').value,
     tmdb_id: selectedTmdb?.id || null, poster_path: selectedTmdb?.poster_path || null,
     is_favorite: $('favorite').checked });
   $('add-button').disabled = false;
   if (error) { message('list-feedback', `Erro ao salvar: ${errorText(error)}`); return; }
-  $('add-form').reset(); resetLookup(); await load();
+  $('add-form').reset(); ['kind', 'availability', 'progress'].forEach(syncChoiceChips); resetLookup(); await load();
   message('list-feedback', 'Indicação guardada na lista!');
 }
 
@@ -316,7 +327,6 @@ function openEdit(id) {
   const item = items.find((entry) => entry.id === id); if (!item) return;
   $('edit-id').value = item.id; $('edit-title').value = item.title;
   $('edit-availability').value = item.availability; $('edit-progress').value = item.progress;
-  $('edit-note').value = item.note || ''; $('edit-reel').value = item.reel_url || '';
   $('edit-favorite').checked = item.is_favorite === true;
   editPoster = { id: item.tmdb_id ?? null, poster_path: item.poster_path ?? null };
   renderEditPoster();
@@ -418,7 +428,6 @@ async function updateItem(event) {
   event.preventDefault();
   const { error } = await db.from('titles').update({ title: $('edit-title').value.trim(),
     availability: $('edit-availability').value, progress: $('edit-progress').value,
-    note: $('edit-note').value.trim() || null, reel_url: $('edit-reel').value.trim() || null,
     tmdb_id: editPoster?.id ?? null, poster_path: editPoster?.poster_path ?? null,
     is_favorite: $('edit-favorite').checked }).eq('id', $('edit-id').value);
   if (error) { alert(`Não foi possível salvar: ${errorText(error)}`); return; }
@@ -433,10 +442,25 @@ async function deleteItem() {
 }
 
 function randomPick() {
+  const result = $('random-result');
   const available = items.filter((item) => item.availability === 'sim' && item.progress !== 'assistido');
-  if (!available.length) { message('list-feedback', 'Marquem títulos disponíveis no IPTV para usar o sorteio.'); return; }
+  result.replaceChildren();
+  show('random-result', true);
+
+  if (!available.length) {
+    result.textContent = 'Nenhum título disponível para sortear. Marque um filme ou série como disponível no IPTV.';
+    return;
+  }
+
   const chosen = available[Math.floor(Math.random() * available.length)];
-  message('list-feedback', `Sugestão para hoje: ${chosen.title}`);
+  const kicker = document.createElement('span');
+  kicker.className = 'random-kicker';
+  kicker.textContent = '🍿 Nossa sugestão para hoje';
+  const title = document.createElement('strong');
+  title.textContent = chosen.title;
+  const kind = document.createElement('small');
+  kind.textContent = chosen.kind === 'serie' ? '📺 Série' : '🎬 Filme';
+  result.append(kicker, title, kind);
 }
 
 let voiceRecognition = null;
@@ -525,6 +549,8 @@ async function init() {
   $('signup').addEventListener('click', signup);
   $('logout').addEventListener('click', async () => { await db.auth.signOut(); });
   $('add-form').addEventListener('submit', addItem);
+  document.querySelectorAll('.choice-chip').forEach((button) => button.addEventListener('click', () => setChoice(button.dataset.field, button.dataset.value)));
+  ['kind', 'availability', 'progress'].forEach(syncChoiceChips);
   $('edit-form').addEventListener('submit', updateItem);
   $('delete-item').addEventListener('click', deleteItem);
   $('close-dialog').addEventListener('click', () => $('edit-dialog').close());
